@@ -1,0 +1,369 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                     ✅ CHECKLIST - SERVICE-VOYAGE FUSIONNÉ                   ║
+║                                                                              ║
+║  Microservices Enterprise - 25 Mars 2026                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  📋 SECTION 1: PRÉPARATION AVANT LANCEMENT                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Vérifications:
+  ┌─ [ ] MySQL est installé et running
+  │       → Commande: mysql --version
+  │       → Démarrer: net start MySQL80
+  │
+  ├─ [ ] Node.js est installé (v18+)
+  │       → Commande: node --version
+  │
+  ├─ [ ] npm est installé (v9+)
+  │       → Commande: npm --version
+  │
+  ├─ [ ] Ports 3000-3009 sont libres
+  │       → Commande: netstat -ano | findstr :3000
+  │       → Si occupé: taskkill /PID xxxxx /F
+  │
+  └─ [ ] Internet connexion (pour dépendances npm)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🚀 SECTION 2: LANCEMENT DES SERVICES                                      │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Étape 1: Ouvrir Terminal CMD dans le dossier PROJECT
+  ┌─ [ ] Naviguer dans:
+  │    c:\Users\mon pc\Desktop\office\ani web-entreprise\projet strucutre entreprise\multiservices-app
+  │
+  │    Raccourci: Appuyer ALT+D et taper le chemin
+
+  Étape 2: Lancer le script
+  ┌─ [ ] Taper: START_ALL.cmd
+  │
+  └─ [ ] Attendre 20-30 secondes pendant le démarrage
+         (Des 9 nouveaux terminals vont s'ouvrir)
+
+
+  ✅ À VOIR APRÈS DÉMARRAGE:
+  ┌─ [ ] Terminal 1: 🚀 API GATEWAY DÉMARRÉ (PORT 3001)
+  ├─ [ ] Terminal 2: ✅ Service Auth démarré (PORT 3002)
+  ├─ [ ] Terminal 3: 🚀 [SERVICE-VOYAGE] DÉMARRÉ (PORT 3009) ← NOUVEAU!
+  ├─ [ ] Terminal 4: BTP service running (PORT 3003)
+  ├─ [ ] Terminal 5: Assurances service running (PORT 3004)
+  ├─ [ ] Terminal 6: Communication service running (PORT 3005)
+  ├─ [ ] Terminal 7: RH service running (PORT 3006)
+  ├─ [ ] Terminal 8: Logistique service running (PORT 3008)
+  └─ [ ] Terminal 9: Frontend running à http://localhost:3000 ✅
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🌐 SECTION 3: TESTER LE FRONTEND LOGIN                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Étape 1: Ouvrir navigateur
+  ┌─ [ ] Aller à: http://localhost:3000/login
+
+  Étape 2: Vérifier la page de login
+  ┌─ [ ] La page charge correctement
+  ├─ [ ] Voir le formulaire de login
+  └─ [ ] Voir la liste des DÉPARTEMENTS
+
+  Étape 3: Vérifier les DÉPARTEMENTS affichés
+  ┌─ [ ] ✅ PDG / Direction Générale          (DOIT APPARAÎTRE)
+  ├─ [ ] ✅ Secrétariat                       (DOIT APPARAÎTRE)
+  ├─ [ ] ✅ Service Assurance                 (DOIT APPARAÎTRE)
+  ├─ [ ] ✅ BTP & Construction                (DOIT APPARAÎTRE)
+  ├─ [ ] ✅ Ressources Humaines               (DOIT APPARAÎTRE)
+  ├─ [ ] ✅ Service Voyage & Immigration ← FUSIONNÉ! (DOIT APPARAÎTRE)
+  ├─ [ ] ✅ Service Logistique                (DOIT APPARAÎTRE)
+  ├─ [ ] ✅ Communication Digitale            (DOIT APPARAÎTRE)
+  │
+  └─ [ ] ❌ Immigration (seul) DOIT ÊTRE ABSENT! ← IMPORTANT!
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🔐 SECTION 4: AUTHENTIFICATION                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Tenter un Login (utiliser credentials de test):
+  ┌─ [ ] Email: user@company.com
+  ├─ [ ] Password: password123
+  │
+  ├─ [ ] Cliquer "Se connecter"
+  │
+  └─ [ ] Attendre la validation
+        (Peut prendre 2-3 secondes)
+
+
+  ✅ APRÈS LOGIN RÉUSSI:
+  ┌─ [ ] Redirection vers le DASHBOARD
+  │
+  └─ [ ] Voir le titre: "Service Voyage & Immigration"
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  📊 SECTION 5: TESTER LE DASHBOARD VOYAGE                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Voir les TABS (onglets):
+  ┌─ [ ] TAB 1: "Service Voyage" (avec icône ✈️)
+  │       → Cliquer dessus
+  │       → Voir les statistiques VOYAGE:
+  │          • Nombre de Clients
+  │          • Nombre de Réservations
+  │          • Chiffre d'affaires
+  │          • Destinations
+  │       → Voir les boutons:
+  │          • Clients
+  │          • Destinations
+  │          • Offres
+  │          • Réservations
+  │
+  └─ [ ] TAB 2: "Service Immigration" (avec icône 🛂)
+          → Cliquer dessus
+          → Voir les statistiques IMMIGRATION:
+             • Nombre de Dossiers
+             • Dossiers Approuvés
+             • En attente
+             • Rendez-vous prévus
+          → Voir les boutons:
+             • Candidats
+             • Dossiers
+             • Rendez-vous
+             • Visas
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🔌 SECTION 6: TESTER LES SERVICES HEALTH                                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Ouvrir PowerShell et tester les endpoints:
+
+  [ ] Test 1: API Gateway Health
+      Commande: Invoke-WebRequest http://localhost:3001/health -UseBasicParsing
+      Résultat attendu:
+        • gateway: OK
+        • services: auth, btp, assurances, communication, rh, voyage, logistique
+        • timestamp: [date/heure actuelle]
+
+  [ ] Test 2: Service-Voyage Health ← NOUVEAU!
+      Commande: Invoke-WebRequest http://localhost:3009/health -UseBasicParsing
+      Résultat attendu:
+        • service: service-voyage
+        • status: active
+        • port: 3009
+        • databases: ["voyage_db", "voyage_immigration_db"]
+
+  [ ] Test 3: Vérifier tous les PORTS
+      Commande: Pour port 3000 à 3009:
+                Invoke-WebRequest http://localhost:300X -ErrorAction SilentlyContinue
+      Résultat: Chaque port doit répondre (OK ou connexion)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  💾 SECTION 7: VÉRIFIER LES BASES DE DONNÉES                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Ouvrir MySQL Workbench ou ligne de commande:
+
+  [ ] Commande: mysql -u root -p
+      Puis: SHOW DATABASES;
+
+  [ ] Vérifier que toutes ces BD existent:
+      ✅ auth_db
+      ✅ btp_db
+      ✅ assurances_db
+      ✅ communication_db
+      ✅ rh_db
+      ✅ voyage_db ← Pour les clients voyage
+      ✅ voyage_immigration_db ← Pour les dossiers immigration (NOUVEAU!)
+      ✅ logistique_db
+
+  [ ] Total: 8 bases de données SÉPARÉES
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🔐 SECTION 8: VÉRIFIER JWT SECRETS INDÉPENDANTS                          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  [ ] Vérifier que chaque service a son JWT_SECRET unique:
+
+      1️⃣  backend/auth-service/.env
+          JWT_SECRET=auth_secret_key_2026_microservice ✅
+
+      2️⃣  backend/btp/.env
+          JWT_SECRET=btp_secret_key_2026_microservice ✅
+
+      3️⃣  backend/assurances/.env
+          JWT_SECRET=assurances_secret_key_2026_microservice ✅
+
+      4️⃣  backend/communication/.env
+          JWT_SECRET=communication_secret_key_2026_microservice ✅
+
+      5️⃣  backend/rh/.env
+          JWT_SECRET=rh_secret_key_2026_microservice ✅
+
+      6️⃣  backend/service-voyage/.env ← NOUVEAU!
+          JWT_SECRET=voyage_secret_key_2026_microservice ✅
+
+      7️⃣  backend/service-logistique/.env
+          JWT_SECRET=logistique_secret_key_2026_microservice ✅
+
+      8️⃣  backend/api-gateway/.env
+          JWT_SECRET=gateway_secret_key_2026_microservice ✅
+
+  [ ] CRUCIAL: Aucun secret ne doit être identique!
+               (Vérifier que tous sont DIFFÉRENTS)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🧪 SECTION 9: TEST D'ISOLATION MICROSERVICES                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  TEST IMPORTANT: Vérifier qu'un service crash ≠ affecte les autres
+
+  [ ] Étape 1: Service running normalement
+      → Terminal Voyage est actif
+      → Dashboard Voyage affiche les données
+
+  [ ] Étape 2: Arrêter le service BTP
+      → Aller au Terminal BTP
+      → Appuyer: Ctrl+C
+      → Le terminal BTP se fermera
+
+  [ ] Étape 3: Tester que Voyage continue
+      → Retourner à http://localhost:3000/dashboard/voyage
+      → Rafraîchir la page
+      → ✅ Les données Voyage doivent TOUJOURS s'afficher!
+
+  [ ] Résultat: Si voyage continue alors que BTP est down
+               → MICROSERVICES ISOLATION RÉUSSIE! 🎯
+
+  [ ] Étape 4: Relancer BTP
+      → Terminal BTP: Taper npm start
+      → Attendre le redémarrage
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  📁 SECTION 10: VÉRIFIER LES FICHIERS CRÉÉS                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  [ ] Fichiers backend créés:
+      ✅ backend/service-voyage/.env
+      ✅ backend/service-voyage/package.json
+      ✅ backend/service-voyage/server.js
+      ✅ backend/service-voyage/middleware/auth.js
+
+  [ ] Fichiers modifiés:
+      ✅ backend/api-gateway/server.js (routes mises à jour)
+      ✅ backend/api-gateway/.env (JWT_SECRET unique)
+      ✅ backend/rh/.env (JWT_SECRET unique)
+      ✅ frontend/src/app/login/page.tsx (immigration retiré)
+      ✅ frontend/src/app/dashboard/voyage/page.tsx (2 tabs!)
+
+  [ ] Fichiers documentation créés:
+      ✅ README.md (vous êtes ici!)
+      ✅ GUIDE_LANCEMENT.md (guide complet)
+      ✅ CHANGELOG.md (tous les changements)
+      ✅ TESTS_RAPIDES.md (tests copier-coller)
+      ✅ START_ALL.cmd (lancer auto)
+      ✅ START_ALL.ps1 (lancer auto PowerShell)
+      ✅ PROJECT_STATE.json (état du projet)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ⚠️  SECTION 11: TROUBLESHOOTING                                          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  [ ] Problème: "Port 3001 déjà utilisé"
+      Solution: netstat -ano | findstr :3001
+                taskkill /PID xxxxx /F
+
+  [ ] Problème: "Cannot connect to MySQL"
+      Solution: net start MySQL80
+                Vérifier credentials dans .env files
+
+  [ ] Problème: "Frontend blank ou erreur"
+      Solution: Vérifier que TOUS les services backend sont running
+                Vérifier que build réussi
+                Consulter les logs du terminal frontend
+
+  [ ] Problème: "Service-Voyage ne démarre pas"
+      Solution: Vérifier backend/service-voyage/.env
+                Vérifier que voyage_db + voyage_immigration_db existent
+                Consulter les logs du terminal Service-Voyage
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ✨ SECTION 12: INDICATEURS DE SUCCÈS                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  [ ] SUCCÈS si:
+
+      ✅ http://localhost:3000/login charge correctement
+      ✅ "Service Voyage & Immigration" apparaît (pas "Immigration" seul)
+      ✅ Peut se connecter avec credentials
+      ✅ Dashboard montre "Service Voyage & Immigration"
+      ✅ Dashboard a 2 TABS: "Voyage" et "Immigration"
+      ✅ TAB Voyage: affiche stats voyage + boutons voyage
+      ✅ TAB Immigration: affiche stats immigration + boutons immigration
+      ✅ http://localhost:3009/health répond
+      ✅ 8 services backend running (ports 3001-3009)
+      ✅ MySQL a 8 bases de données
+      ✅ Tous les JWT_SECRET sont UNIQUES
+      ✅ Arrêter BTP ≠ affecte Voyage (microservices isolation)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  📊 RÉSUMÉ RAPIDE                                                           │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Service-Voyage Fusionné:
+  ├─ ✅ Backend: 1 service (service-voyage, port 3009)
+  ├─ ✅ Frontend: 1 page (voyage/page.tsx)
+  ├─ ✅ BD: 2 bases (voyage_db + voyage_immigration_db)
+  ├─ ✅ Login: 1 entrée ("Service Voyage & Immigration")
+  └─ ✅ Dashboard: 2 tabs (Voyage + Immigration)
+
+  Microservices Architecture:
+  ├─ ✅ 8 services indépendants
+  ├─ ✅ 8 JWT secrets DIFFÉRENTS
+  ├─ ✅ 8 ports DIFFÉRENTS
+  ├─ ✅ API Gateway router central
+  └─ ✅ Vraie isolation (si 1 crash ≠ affecte autres)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  🎯 PROCHAINES ÉTAPES                                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  [ ] Immédiat:
+      1. Lancer: START_ALL.cmd
+      2. Tester: http://localhost:3000/login
+      3. Vérifier: "Service Voyage & Immigration"
+
+  [ ] Court terme:
+      1. Consulter: TESTS_RAPIDES.md (12 tests complets)
+      2. Performance tuning
+      3. Load testing
+
+  [ ] Long terme:
+      1. Docker deployment
+      2. Kubernetes orchestration
+      3. CI/CD pipeline
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        ✅ CHECKLIST COMPLÉTÉE?                             ║
+║                                                                              ║
+║  Si TOUS les cases [ ] sont cochées:                                       ║
+║  🎉 CONGRATULATIONS! SERVICE-VOYAGE EST PRÊT! 🎉                          ║
+║                                                                              ║
+║  Vous pouvez maintenant:                                                   ║
+║  • Utiliser l'application en production                                   ║
+║  • Déployer sur Docker/Kubernetes                                        ║
+║  • Ajouter plus de fonctionnalités                                       ║
+║  • Optimiser les performances                                             ║
+║                                                                              ║
+║  📚 Lire les autres documentations pour plus de détails!                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝

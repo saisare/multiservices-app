@@ -1,0 +1,76 @@
+════════════════════════════════════════════════════════════════════════════════
+
+                    ✨ 3 ÉTAPES POUR GITHUB ✨
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+UTILISATEUR: blgengineering
+EMAIL: nossijunior23@gmail.com
+DÉPÔT: multiservices-app
+DESCRIPTION: vs code
+
+
+════════════════════════════════════════════════════════════════════════════════
+ÉTAPE 1: Exécuter le script
+════════════════════════════════════════════════════════════════════════════════
+
+Double-cliquez sur: AUTOMATISER_GITHUB.bat
+
+C'est tout! Le script va:
+  ✅ Configurer Git
+  ✅ Initialiser le dépôt local
+  ✅ Ajouter tous les fichiers
+  ✅ Créer le commit
+  ✅ Afficher les instructions
+
+Durée: ~1 minute
+
+
+════════════════════════════════════════════════════════════════════════════════
+ÉTAPE 2: Créer le dépôt sur GitHub (Manuel - 2 minutes)
+════════════════════════════════════════════════════════════════════════════════
+
+1. Ouvrez: https://github.com/new
+2. Connectez-vous avec blgengineering
+3. Repository name: multiservices-app
+4. Description: vs code
+5. Public
+6. NE cochez PAS "Initialize with README"
+7. Cliquez: "Create repository"
+
+
+════════════════════════════════════════════════════════════════════════════════
+ÉTAPE 3: Générer le token et pousser (3 minutes)
+════════════════════════════════════════════════════════════════════════════════
+
+A. Générer le token:
+   - Allez sur: https://github.com/settings/tokens
+   - "Generate new token (classic)"
+   - Sélectionnez "repo" et "workflow"
+   - Cliquez "Generate"
+   - COPIEZ le token (ghp_xxxxxxxxxxxxx)
+
+B. Pousser le code:
+   - Ouvrez CMD
+   - Exécutez:
+
+   cd "C:\Users\mon pc\Desktop\office\ani web-entreprise\projet strucutre entreprise\multiservices-app"
+
+   git remote add origin https://<VOTRE_TOKEN>@github.com/blgengineering/multiservices-app.git
+
+   git push -u origin main
+
+
+════════════════════════════════════════════════════════════════════════════════
+✅ VÉRIFICATION
+════════════════════════════════════════════════════════════════════════════════
+
+Ouvrez: https://github.com/blgengineering/multiservices-app
+
+Vous devez voir tous vos fichiers et dossiers!
+
+
+════════════════════════════════════════════════════════════════════════════════
+C'EST TERMINÉ! 🎉
+════════════════════════════════════════════════════════════════════════════════

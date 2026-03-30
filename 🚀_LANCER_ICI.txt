@@ -1,0 +1,81 @@
+════════════════════════════════════════════════════════════════════════════════
+
+                    🚀 LANCER TOUS LES SERVICES 🚀
+
+════════════════════════════════════════════════════════════════════════════════
+
+
+C'EST SIMPLE - Double-cliquez sur:
+
+    LANCER_TOUS_LES_SERVICES.bat
+
+
+CE QUI VA SE PASSER:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣  Vérification des prérequis
+    ✅ MySQL
+    ✅ Node.js
+    ✅ npm
+
+2️⃣  Ouverture de 3 terminaux automatiquement:
+
+    Terminal 1: Auth Service (Port 3002)
+    Terminal 2: API Gateway (Port 3001)
+    Terminal 3: Frontend (Port 3000)
+
+3️⃣  Affichage des adresses:
+    Frontend: http://localhost:3000
+    API: http://localhost:3001/health
+
+4️⃣  Les services restent actifs!
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+APRÈS QUE LES SERVICES DÉMARRENT:
+
+1. Attendez 10-15 secondes (première démarrage)
+
+2. Ouvrez votre navigateur:
+   http://localhost:3000/login
+
+3. Entrez les identifiants:
+   Email: admin@blg-engineering.com
+   Password: Blg1app23@
+
+4. Cliquez "Se Connecter"
+
+5. Vous devez voir le dashboard!
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+ARRÊTER LES SERVICES:
+
+Fermez simplement les 3 terminaux (Ctrl+C ou bouton X)
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+PROBLÈMES?
+
+Port utilisé?
+  netstat -ano | findstr :3001
+  taskkill /PID <PID> /F
+
+MySQL n'est pas actif?
+  net start MySQL80
+
+Services ne démarre pas?
+  Vérifiez les logs du terminal
+  npm install (dans le dossier du service)
+
+
+════════════════════════════════════════════════════════════════════════════════
+
+PRÊT? 🚀
+
+Double-cliquez sur: LANCER_TOUS_LES_SERVICES.bat
+
+════════════════════════════════════════════════════════════════════════════════
