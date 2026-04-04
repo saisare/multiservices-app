@@ -51,7 +51,7 @@ export default function ChantiersPage() {
       setTaches(tachesMap);
 
   } catch (err: unknown) {
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Erreur de chargement');
     } finally {
       setLoading(false);
     }
@@ -59,11 +59,11 @@ export default function ChantiersPage() {
 
   const getStatutColor = (statut: string) => {
     switch (statut) {
-      case 'EN_COURS': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'TERMINE': return 'bg-green-100 text-green-700 border-green-200';
-      case 'SUSPENDU': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'ANNULE': return 'bg-red-100 text-red-700 border-red-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+      case 'EN_COURS': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'TERMINE': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'SUSPENDU': return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'ANNULE': return 'bg-rose-100 text-rose-700 border-rose-200';
+      default: return 'bg-stone-100 text-stone-700 border-stone-200';
     }
   };
 
@@ -116,7 +116,7 @@ export default function ChantiersPage() {
         </div>
         <Link
           href="/dashboard/btp/chantiers/nouveau"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center"
         >
           <Plus className="w-4 h-4 mr-2" />
           Nouveau chantier
@@ -132,29 +132,29 @@ export default function ChantiersPage() {
 
       {/* Statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-orange-100 p-4">
           <p className="text-sm text-gray-600">Total chantiers</p>
           <p className="text-2xl font-bold">{chantiers.length}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-orange-100 p-4">
           <p className="text-sm text-gray-600">En cours</p>
           <p className="text-2xl font-bold text-blue-600">
             {chantiers.filter(c => c.statut === 'EN_COURS').length}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-orange-100 p-4">
           <p className="text-sm text-gray-600">Terminés</p>
           <p className="text-2xl font-bold text-green-600">
             {chantiers.filter(c => c.statut === 'TERMINE').length}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-orange-100 p-4">
           <p className="text-sm text-gray-600">Tâches en cours</p>
           <p className="text-2xl font-bold text-purple-600">
             {Object.values(taches).flat().filter(t => t.statut === 'EN_COURS').length}
           </p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-orange-100 p-4">
           <p className="text-sm text-gray-600">Budget total</p>
           <p className="text-2xl font-bold">
             {chantiers.reduce((sum, c) => sum + (c.budget || 0), 0).toLocaleString()} €
@@ -163,7 +163,7 @@ export default function ChantiersPage() {
       </div>
 
       {/* Filtres et recherche */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="bg-white rounded-xl border border-orange-100 p-4">
         <div className="flex flex-wrap gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -172,14 +172,14 @@ export default function ChantiersPage() {
               placeholder="Rechercher un chantier..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
           >
             <option value="all">Tous les statuts</option>
             <option value="EN_COURS">En cours</option>
@@ -191,7 +191,7 @@ export default function ChantiersPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
           >
             <option value="date">Trier par date</option>
             <option value="nom">Trier par nom</option>
@@ -211,7 +211,7 @@ export default function ChantiersPage() {
             : 0;
 
           return (
-            <div key={chantier.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div key={chantier.id} className="bg-white rounded-xl border border-orange-100 overflow-hidden">
               {/* En-tête du chantier (toujours visible) */}
               <div 
                 className="p-4 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -252,7 +252,7 @@ export default function ChantiersPage() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all"
+                          className="bg-orange-600 h-2 rounded-full transition-all"
                           style={{ width: `${progression}%` }}
                         />
                       </div>

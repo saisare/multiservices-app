@@ -1,5 +1,6 @@
+﻿import { buildServiceBase } from './runtime-api';
 // src/lib/api.ts - Client API unifié Gateway (3001)
-const API_GATEWAY = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_GATEWAY = process.env.NEXT_PUBLIC_API_URL || buildServiceBase(3001);
 
 // Offline mode flag - set to false for real backend
 const OFFLINE_MODE = false;
@@ -147,4 +148,5 @@ export type DeptStats = {
   campagnes?: number;
   [key: string]: any;
 };
+
 

@@ -5,51 +5,88 @@ import Link from 'next/link';
 import {
   Plane, Hotel, Calendar, FileText, Users, Globe,
   TrendingUp, DollarSign, Clock, CheckCircle, AlertCircle,
-  Plus, MapPin, Briefcase, Passport, MapPinned
+  Plus, MapPin, Briefcase, ShieldCheck, Loader
 } from 'lucide-react';
+import { voyageApi } from '@/services/api/voyage.api';
 
 export default function VoyageDashboard() {
   const [activeTab, setActiveTab] = useState<'voyage' | 'immigration'>('voyage');
-  
-  // Stats Voyage
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Stats
   const [statsVoyage, setStatsVoyage] = useState({
-    totalClients: 128,
-    totalReservations: 156,
-    chiffreAffaires: 125000,
-    tauxOccupation: 78,
-    destinations: 24
+    totalClients: 0,
+    totalReservations: 0,
+    chiffreAffaires: 0,
+    destinations: 0
   });
 
-  // Stats Immigration
   const [statsImmigration, setStatsImmigration] = useState({
-    totalDossiers: 32,
-    dossiersValides: 24,
-    dossiersPending: 6,
-    tauxApprobation: 85,
-    rendezVous: 8
+    totalDossiers: 0,
+    dossiersValides: 0,
+    dossiersPending: 0,
+    tauxApprobation: 0,
+    rendezVous: 0
   });
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const stats = await voyageApi.getStats();
+      const clients = await voyageApi.getVoyageClients();
+      const destinations = await voyageApi.getDestinations();
+      const dossiers = await voyageApi.getDossiers();
+      const rendezVous = await voyageApi.getRendezVous();
+
+      // Set Voyage stats
+      setStatsVoyage({
+        totalClients: clients?.length || 0,
+        totalReservations: stats?.voyage?.totalClients || 0,
+        chiffreAffaires: 125000,
+        destinations: destinations?.length || 0
+      });
+
+      // Set Immigration stats
+      setStatsImmigration({
+        totalDossiers: dossiers?.length || 0,
+        dossiersValides: stats?.immigration?.approves || 0,
+        dossiersPending: (dossiers?.filter((d: any) => d.statut === 'EN_ATTENTE') || []).length,
+        tauxApprobation: Math.round(((stats?.immigration?.approves || 0) / (dossiers?.length || 1)) * 100),
+        rendezVous: rendezVous?.length || 0
+      });
+    } catch (err: any) {
+      setError(err.message || 'Erreur chargement données');
+      console.error('Erreur:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-3">
+          <Loader className="w-8 h-8 animate-spin text-blue-600" />
+          <p className="text-gray-600">Chargement du tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header unifié */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Service Voyage & Immigration</h1>
-          <p className="text-gray-600 mt-2">Gestion des voyages et dossiers de visa</p>
-        </div>
-        <div className="flex space-x-3">
-          {activeTab === 'voyage' && (
-            <Link href="/dashboard/voyage/offres?action=new" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
-              <Plus className="w-4 h-4 mr-2" />
-              Nouvelle réservation
-            </Link>
-          )}
-          {activeTab === 'immigration' && (
-            <Link href="/dashboard/voyage/rendey-vous?action=new" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center">
-              <Plus className="w-4 h-4 mr-2" />
-              Nouveau dossier
-            </Link>
-          )}
+          <p className="text-gray-600 mt-2">Gestion complète des voyages et demandes de visa</p>
         </div>
       </div>
 
@@ -74,78 +111,69 @@ export default function VoyageDashboard() {
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          <Passport className="w-5 h-5" />
+          <ShieldCheck className="w-5 h-5" />
           Service Immigration
         </button>
       </div>
+
+      {error && (
+        <div className="flex gap-3 p-4 bg-red-100 border border-red-300 rounded-lg text-red-700">
+          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* SECTION VOYAGE */}
       {activeTab === 'voyage' && (
         <div className="space-y-6">
           {/* Stats Voyage */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <Users className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsVoyage.totalClients}</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">Clients</p>
+              <Users className="w-8 h-8 opacity-80" />
+              <p className="mt-3 text-sm opacity-90">Clients</p>
+              <p className="text-3xl font-bold">{statsVoyage.totalClients}</p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <Calendar className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsVoyage.totalReservations}</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">Réservations</p>
+              <Calendar className="w-8 h-8 opacity-80" />
+              <p className="mt-3 text-sm opacity-90">Réservations</p>
+              <p className="text-3xl font-bold">{statsVoyage.totalReservations}</p>
             </div>
 
             <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <DollarSign className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsVoyage.chiffreAffaires / 1000}K €</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">Chiffre d'affaires</p>
+              <Globe className="w-8 h-8 opacity-80" />
+              <p className="mt-3 text-sm opacity-90">Destinations</p>
+              <p className="text-3xl font-bold">{statsVoyage.destinations}</p>
             </div>
 
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <Globe className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsVoyage.destinations}</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">Destinations</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <TrendingUp className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsVoyage.tauxOccupation}%</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">Occupation</p>
+              <DollarSign className="w-8 h-8 opacity-80" />
+              <p className="mt-3 text-sm opacity-90">CA</p>
+              <p className="text-3xl font-bold">{(statsVoyage.chiffreAffaires / 1000).toFixed(0)}K €</p>
             </div>
           </div>
 
-          {/* Actions Voyage */}
+          {/* Quick Actions */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Link href="/dashboard/voyage/clients" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
-              <Users className="w-8 h-8 text-blue-500 mb-2" />
-              <p className="font-semibold">Clients</p>
+              <Users className="w-8 h-8 text-blue-500 mb-3" />
+              <p className="font-semibold text-gray-900">Clients</p>
               <p className="text-sm text-gray-600">Gérer les voyageurs</p>
             </Link>
             <Link href="/dashboard/voyage/destinations" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
-              <Globe className="w-8 h-8 text-green-500 mb-2" />
-              <p className="font-semibold">Destinations</p>
+              <Globe className="w-8 h-8 text-green-500 mb-3" />
+              <p className="font-semibold text-gray-900">Destinations</p>
               <p className="text-sm text-gray-600">Villes & pays</p>
             </Link>
             <Link href="/dashboard/voyage/offres" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
-              <Plane className="w-8 h-8 text-purple-500 mb-2" />
-              <p className="font-semibold">Offres</p>
+              <Plane className="w-8 h-8 text-purple-500 mb-3" />
+              <p className="font-semibold text-gray-900">Offres</p>
               <p className="text-sm text-gray-600">Vols & hôtels</p>
             </Link>
-            <Link href="/dashboard/voyage/offres" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
-              <Calendar className="w-8 h-8 text-orange-500 mb-2" />
-              <p className="font-semibold">Réservations</p>
-              <p className="text-sm text-gray-600">Gestion des réservations</p>
+            <Link href="/dashboard/voyage/dossiers" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
+              <Calendar className="w-8 h-8 text-orange-500 mb-3" />
+              <p className="font-semibold text-gray-900">Réservations</p>
+              <p className="text-sm text-gray-600">Gestion réservations</p>
             </Link>
           </div>
         </div>
@@ -157,67 +185,57 @@ export default function VoyageDashboard() {
           {/* Stats Immigration */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <FileText className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsImmigration.totalDossiers}</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">Dossiers total</p>
+              <FileText className="w-8 h-8 opacity-80" />
+              <p className="mt-3 text-sm opacity-90">Dossiers total</p>
+              <p className="text-3xl font-bold">{statsImmigration.totalDossiers}</p>
             </div>
 
             <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <CheckCircle className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsImmigration.dossiersValides}</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">Approuvés</p>
+              <CheckCircle className="w-8 h-8 opacity-80" />
+              <p className="mt-3 text-sm opacity-90">Approuvés</p>
+              <p className="text-3xl font-bold">{statsImmigration.dossiersValides}</p>
             </div>
 
             <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <Clock className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsImmigration.dossiersPending}</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">En attente</p>
+              <Clock className="w-8 h-8 opacity-80" />
+              <p className="mt-3 text-sm opacity-90">En attente</p>
+              <p className="text-3xl font-bold">{statsImmigration.dossiersPending}</p>
             </div>
 
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <Calendar className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsImmigration.rendezVous}</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">RDV prévus</p>
+              <Calendar className="w-8 h-8 opacity-80" />
+              <p className="mt-3 text-sm opacity-90">RDV prévus</p>
+              <p className="text-3xl font-bold">{statsImmigration.rendezVous}</p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
-              <div className="flex items-center justify-between">
-                <TrendingUp className="w-8 h-8 opacity-80" />
-                <span className="text-2xl font-bold">{statsImmigration.tauxApprobation}%</span>
-              </div>
-              <p className="mt-2 text-sm opacity-90">Taux approbation</p>
+              <TrendingUp className="w-8 h-8 opacity-80" />
+              <p className="mt-3 text-sm opacity-90">Taux approbation</p>
+              <p className="text-3xl font-bold">{statsImmigration.tauxApprobation}%</p>
             </div>
           </div>
 
-          {/* Actions Immigration */}
+          {/* Quick Actions */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Link href="/dashboard/voyage/candidat" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
-              <Briefcase className="w-8 h-8 text-green-500 mb-2" />
-              <p className="font-semibold">Candidats</p>
-              <p className="text-sm text-gray-600">Gérer les candidats</p>
+            <Link href="/dashboard/service-immigration/candidat" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
+              <Briefcase className="w-8 h-8 text-green-500 mb-3" />
+              <p className="font-semibold text-gray-900">Candidats</p>
+              <p className="text-sm text-gray-600">Gérer candidats</p>
             </Link>
-            <Link href="/dashboard/voyage/dossiers" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
-              <FileText className="w-8 h-8 text-blue-500 mb-2" />
-              <p className="font-semibold">Dossiers</p>
-              <p className="text-sm text-gray-600">Suivi des dossiers</p>
+            <Link href="/dashboard/service-immigration/dossiers" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
+              <FileText className="w-8 h-8 text-blue-500 mb-3" />
+              <p className="font-semibold text-gray-900">Dossiers</p>
+              <p className="text-sm text-gray-600">Suivi dossiers</p>
             </Link>
-            <Link href="/dashboard/voyage/rendey-vous" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
-              <Calendar className="w-8 h-8 text-purple-500 mb-2" />
-              <p className="font-semibold">Rendez-vous</p>
+            <Link href="/dashboard/service-immigration/rendey-vous" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
+              <Calendar className="w-8 h-8 text-purple-500 mb-3" />
+              <p className="font-semibold text-gray-900">Rendez-vous</p>
               <p className="text-sm text-gray-600">Planification</p>
             </Link>
-            <Link href="/dashboard/voyage/candidat" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
-              <Passport className="w-8 h-8 text-orange-500 mb-2" />
-              <p className="font-semibold">Visas</p>
-              <p className="text-sm text-gray-600">Gestion des visas</p>
+            <Link href="/dashboard/service-immigration/candidat" className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all">
+              <ShieldCheck className="w-8 h-8 text-orange-500 mb-3" />
+              <p className="font-semibold text-gray-900">Visas</p>
+              <p className="text-sm text-gray-600">Gestion visas</p>
             </Link>
           </div>
         </div>

@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const cors = require('cors');
@@ -17,7 +17,7 @@ const services = {
   'assurances': 'http://localhost:3004',
   'communication': 'http://localhost:3005',
   'rh': 'http://localhost:3006',
-  'voyage': 'http://localhost:3009', // Service unifié: Voyage + Immigration
+  'voyage': 'http://localhost:3009', // Service unifiÃ©: Voyage + Immigration
   'logistique': 'http://localhost:3008'
 };
 
@@ -30,13 +30,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Auth middleware - Valide le token pour l'accès au gateway
+// Auth middleware - Valide le token pour l'accÃ¨s au gateway
 const authMiddleware = (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
   
   if (!token) return res.status(401).json({ error: 'Token requis' });
   
-  // Le gateway n'a qu'un rôle de proxy - la vraie validation se fait dans chaque service
+  // Le gateway n'a qu'un rÃ´le de proxy - la vraie validation se fait dans chaque service
   // avec son propre JWT_SECRET
   try {
     jwt.verify(token, process.env.JWT_SECRET || 'gateway_secret_key_2026_microservice');
@@ -94,10 +94,11 @@ app.get('/api/services', (req, res) => {
   res.json(services);
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 API GATEWAY DÉMARRÉ (PORT ${PORT})`);
-  console.log('📡 Health: http://localhost:' + PORT + '/health');
-  console.log('📋 Services: http://localhost:' + PORT + '/api/services');
-  console.log('✅ Prêt !\n');
+app.listen(PORT, process.env.HOST || '0.0.0.0', () => {
+  console.log(`\nðŸš€ API GATEWAY DÃ‰MARRÃ‰ (PORT ${PORT})`);
+  console.log('ðŸ“¡ Health: http://localhost:' + PORT + '/health');
+  console.log('ðŸ“‹ Services: http://localhost:' + PORT + '/api/services');
+  console.log('âœ… PrÃªt !\n');
 });
+
 

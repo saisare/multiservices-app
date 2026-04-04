@@ -25,11 +25,15 @@ export default function NouveauOuvrier() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
-      await btpApi.createOuvrier(formData);
-      // Redirect or success
-    } catch (err) {
-      setError('Erreur création');
+      const createdOuvrier = await btpApi.createOuvrier(formData);
+      console.log('✅ Ouvrier créé:', createdOuvrier);
+      // Redirect to list
+      window.location.href = '/dashboard/btp/ouvriers';
+    } catch (err: any) {
+      setError(err.message || 'Erreur création');
+      console.error('Erreur création ouvrier:', err);
     } finally {
       setLoading(false);
     }

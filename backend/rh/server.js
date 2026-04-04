@@ -1,10 +1,10 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const { verifyToken } = require('./middleware/auth');
 
-console.log('verifyToken =', verifyToken ? '✅ chargé' : '❌ undefined');
+console.log('verifyToken =', verifyToken ? 'âœ… chargÃ©' : 'âŒ undefined');
 
 const app = express();
 const PORT = process.env.PORT || 3006;
@@ -17,16 +17,17 @@ const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'rh_db'
+    password: process.env.DB_PASSWORD || undefined,
+    database: process.env.DB_NAME || 'auth_db',
+    charset: 'utf8mb4'
 });
 
 db.connect(err => {
     if (err) {
-        console.error('❌ Erreur connexion MySQL RH:', err);
+        console.error('âŒ Erreur connexion MySQL RH:', err);
         return;
     }
-    console.log(`✅ Connecté à MySQL ${process.env.DB_NAME}`);
+    console.log(`âœ… ConnectÃ© Ã  MySQL ${process.env.DB_NAME}`);
 });
 
 // Health check
@@ -51,7 +52,7 @@ app.get('/api/employes', verifyToken, (req, res) => {
 app.get('/api/employes/:id', verifyToken, (req, res) => {
     db.query('SELECT * FROM employes WHERE id = ?', [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(404).json({ error: 'Employé non trouvé' });
+        if (results.length === 0) return res.status(404).json({ error: 'EmployÃ© non trouvÃ©' });
         res.json(results[0]);
     });
 });
@@ -71,7 +72,7 @@ app.post('/api/employes', verifyToken, (req, res) => {
             res.status(201).json({
                 id: result.insertId,
                 matricule,
-                message: 'Employé créé avec succès'
+                message: 'EmployÃ© crÃ©Ã© avec succÃ¨s'
             });
         }
     );
@@ -88,7 +89,7 @@ app.put('/api/employes/:id', verifyToken, (req, res) => {
     db.query(sql, [nom, prenom, telephone, adresse, poste, departement, salaire_base, req.params.id],
         (err, result) => {
             if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true, message: 'Employé modifié' });
+            res.json({ success: true, message: 'EmployÃ© modifiÃ©' });
         }
     );
 });
@@ -132,7 +133,7 @@ app.post('/api/conges', verifyToken, (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             res.status(201).json({
                 id: result.insertId,
-                message: 'Demande de congé enregistrée'
+                message: 'Demande de congÃ© enregistrÃ©e'
             });
         }
     );
@@ -145,7 +146,7 @@ app.put('/api/conges/:id/statut', verifyToken, (req, res) => {
         [statut, req.params.id],
         (err, result) => {
             if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true, message: 'Statut mis à jour' });
+            res.json({ success: true, message: 'Statut mis Ã  jour' });
         }
     );
 });
@@ -179,7 +180,7 @@ app.post('/api/formations', verifyToken, (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             res.status(201).json({
                 id: result.insertId,
-                message: 'Formation enregistrée'
+                message: 'Formation enregistrÃ©e'
             });
         }
     );
@@ -214,7 +215,7 @@ app.post('/api/evaluations', verifyToken, (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             res.status(201).json({
                 id: result.insertId,
-                message: 'Évaluation enregistrée'
+                message: 'Ã‰valuation enregistrÃ©e'
             });
         }
     );
@@ -245,11 +246,11 @@ app.get('/api/stats', verifyToken, (req, res) => {
 });
 
 // ===========================================
-// DÉMARRAGE
+// DÃ‰MARRAGE
 // ===========================================
-app.listen(PORT, () => {
-    console.log(`\n🚀 SERVICE RH DÉMARRÉ`);
-    console.log(`📡 URL: http://localhost:${PORT}`);
-    console.log(`🔍 Health: http://localhost:${PORT}/health`);
-    console.log(`✅ Prêt à recevoir des requêtes\n`);
+app.listen(PORT, process.env.HOST || '0.0.0.0', () => {
+    console.log(`\nðŸš€ SERVICE RH DÃ‰MARRÃ‰`);
+    console.log(`ðŸ“¡ URL: http://localhost:${PORT}`);
+    console.log(`ðŸ” Health: http://localhost:${PORT}/health`);
+    console.log(`âœ… PrÃªt Ã  recevoir des requÃªtes\n`);
 });

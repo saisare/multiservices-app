@@ -1,23 +1,19 @@
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (req, res, next) => {
-    // Mode dev: skip auth (TODO: activer en prod)
-    console.log('🔓 Communication: Auth skipped (dev mode)');
-    req.user = { id: 1, role: 'admin' }; // Mock user
-    return next();
-    
-    // Version prod (commentée):
-    /*
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ error: 'Token requis' });
+    const token = req.headers['authorization']?.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Token manquant' });
+    }
+
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_dev');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         req.user = decoded;
         next();
-    } catch (err) {
-        res.status(401).json({ error: 'Token invalide' });
+    } catch (error) {
+        return res.status(401).json({ error: 'Token invalide ou expiré' });
     }
-    */
 };
 
 module.exports = { verifyToken };

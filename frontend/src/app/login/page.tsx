@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { 
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { buildServiceBase } from '@/lib/runtime-api';
+import {
   Lock, Eye, EyeOff, ArrowRight, Building2, Globe, Shield,
   AlertCircle, CheckCircle, Loader, Users, Share2,
   Mail, User, Bell, Clock
@@ -22,10 +23,12 @@ const DEPARTMENTS = [
 
 // Langues disponibles
 const LANGUAGES = [
-  { code: 'fr', name: 'Français'},
-  { code: 'en', name: 'English'},
-  { code: 'de', name: 'Deutsch' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'en', name: 'English', flag: '🇬🇧' },
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
 ];
+
+const AUTH_API_BASE = buildServiceBase(3002);
 
 interface LoginResponse {
   success: boolean;
@@ -40,7 +43,8 @@ interface LoginResponse {
 
 export default function LoginPage() {
   const router = useRouter();
-  
+  const searchParams = useSearchParams();
+
   // États
   const [loginMode, setLoginMode] = useState<'normal' | 'create' | 'share'>('normal');
   const [step, setStep] = useState(1);
@@ -52,6 +56,13 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    const departmentFromUrl = searchParams.get('department');
+    if (departmentFromUrl && DEPARTMENTS.some((dept) => dept.id === departmentFromUrl)) {
+      setSelectedDepartment(departmentFromUrl);
+    }
+  }, [searchParams]);
 
   // États pour création de compte
   const [newUser, setNewUser] = useState({
@@ -102,7 +113,7 @@ export default function LoginPage() {
       errorPasswordMatch: 'Les mots de passe ne correspondent pas',
       errorDepartmentRequired: 'Veuillez sélectionner un département',
       shareSuccess: 'Demande de partage envoyée. Vous serez notifié quand elle sera approuvée.',
-      createSuccess: 'Compte créé avec succès. En attente de validation par l\'administration.'
+      createSuccess: 'Compte créé avec succès! ✅\n\nVotre demande a été enregistrée et est en attente de validation par l\'administration.\n\nVous recevrez un email de confirmation dès approbation. Vous pourrez alors vous connecter avec vos identifiants.'
     },
     en: {
       welcome: 'Welcome to',
@@ -133,7 +144,7 @@ export default function LoginPage() {
       errorPasswordMatch: 'Passwords do not match',
       errorDepartmentRequired: 'Please select a department',
       shareSuccess: 'Share request sent. You will be notified when approved.',
-      createSuccess: 'Account created successfully. Pending admin approval.'
+      createSuccess: 'Account created successfully! ✅\n\nYour request has been recorded and is pending administration approval.\n\nYou will receive a confirmation email as soon as it is approved. You will then be able to log in with your credentials.'
     },
     de: {
       welcome: 'Willkommen bei',
@@ -164,7 +175,7 @@ export default function LoginPage() {
       errorPasswordMatch: 'Passwörter stimmen nicht überein',
       errorDepartmentRequired: 'Bitte wählen Sie eine Abteilung',
       shareSuccess: 'Freigabeanfrage gesendet. Sie werden benachrichtigt.',
-      createSuccess: 'Konto erstellt. Warten auf Admin-Genehmigung.'
+      createSuccess: 'Konto erstellt! ✅\n\nIhre Anfrage wurde registriert und wartet auf Verwaltungsgenehmigung.\n\nSie erhalten eine Bestätigungs-E-Mail sobald genehmigt. Dann können Sie sich mit Ihren Anmeldedaten anmelden.'
     }
   };
 
@@ -217,12 +228,8 @@ export default function LoginPage() {
 
   // Connexion normale
   const handleNormalLogin = async () => {
-    if (!email || !password) {
+    if (!email.trim() || !password.trim()) {
       setError(t.errorEmailRequired || 'Email et mot de passe requis');
-      return;
-    }
-    if (password.length < 8) {
-      setError('Mot de passe trop court (min 8 caractères)');
       return;
     }
 
@@ -235,37 +242,59 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3002/api/auth/login', {
+      const response = await fetch(`${AUTH_API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, departement: selectedDepartment })
       });
 
-
-
       const data = await response.json();
+      console.log('📔 Login response:', data);
 
       if (!response.ok) {
+        console.error('❌ Login failed:', data);
         throw new Error(data.error || 'Erreur de connexion');
       }
 
+      console.log('✅ Login successful, user:', data.user);
+
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Journaliser la connexion
-      await logConnection(data.user.id, 'normal');
+      localStorage.setItem('departement', data.user.departement || selectedDepartment);
+
+      // Store token in cookie for middleware
+      document.cookie = `auth_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+
+      // Journaliser la connexion (non-bloquant - pas d'await)
+      logConnection(data.user.id, email, selectedDepartment).catch(() => {
+        // Ignorer les erreurs de logging - ne pas bloquer le login
+      });
 
       const role = data.user.role || '';
+      console.log('🎯 User role:', role, 'Department:', data.user.departement);
+
       if (role === 'admin') {
-        router.push('/dashboard/admin');
-      } else if (role === 'directeur' || role === 'pdg') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('departement');
+        document.cookie = 'auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
+        console.log('➡️ Redirecting admin to dedicated entry /admin');
+        router.push(`/admin-login?notice=use-admin-portal&email=${encodeURIComponent(email)}`);
+      } else if (role === 'directeur') {
+        console.log('Redirecting directeur to /dashboard/directeur');
+        router.push('/dashboard/directeur');
+      } else if (role === 'pdg') {
+        console.log('➡️ Redirecting to /dashboard/pdg');
         router.push('/dashboard/pdg');
       } else if (role === 'secretaire') {
+        console.log('➡️ Redirecting to /dashboard/secretaire');
         router.push('/dashboard/secretaire');
       } else {
+        console.log('➡️ Redirecting to /dashboard/' + data.user.departement);
         router.push(`/dashboard/${data.user.departement}`);
       }
     } catch (err: any) {
+      console.error('❌ Login error:', err.message);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -277,6 +306,16 @@ export default function LoginPage() {
     // Validation
     if (!newUser.nom || !newUser.prenom || !newUser.email || !newUser.password || !selectedDepartment) {
       setError('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    if (!newUser.telephone) {
+      setError('Le numéro de téléphone est obligatoire');
+      return;
+    }
+
+    if (!newUser.poste) {
+      setError('Le poste est obligatoire');
       return;
     }
 
@@ -297,7 +336,7 @@ export default function LoginPage() {
 
     try {
       // Créer la demande de compte
-      const response = await fetch('http://localhost:3002/api/auth/request-account', {
+      const response = await fetch(`${AUTH_API_BASE}/api/auth/request-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -310,32 +349,29 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Améliorer le message d'erreur 409
+        if (response.status === 409) {
+          if (data.error.includes('déjà utilisé')) {
+            throw new Error('❌ Cet email est déjà utilisé par un compte existant.\n\nSi vous avez oublié votre mot de passe, cliquez sur "Connexion normale" et utilisez les outils de récupération.');
+          } else if (data.error.includes('demande en attente')) {
+            throw new Error('❌ Un compte avec cet email a déjà une demande en attente d\'approbation.\n\nVeuillez attendre la validation par l\'administration ou contacter le support.');
+          }
+        }
         throw new Error(data.error || 'Erreur lors de la création');
       }
 
       // Afficher le message de succès SEULEMENT si la création a réussi
       setSuccess(data.message || t.createSuccess);
-      
+      localStorage.setItem('requested_department', selectedDepartment);
+
       // Envoyer notifications
       if (data.user) {
         await notifyNewAccountRequest(data.user);
       }
 
       setTimeout(() => {
-        setLoginMode('normal');
-        setSuccess('');
-        // Réinitialiser le formulaire
-        setNewUser({
-          nom: '',
-          prenom: '',
-          email: '',
-          telephone: '',
-          poste: '',
-          departement: '',
-          password: '',
-          confirmPassword: ''
-        });
-      }, 3000);
+        router.push(`/compte/en-attente?department=${encodeURIComponent(selectedDepartment)}`);
+      }, 1500);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -355,7 +391,7 @@ export default function LoginPage() {
 
     try {
       // Vérifier les identifiants et créer la session partagée
-      const response = await fetch('http://localhost:3002/api/auth/share-login', {
+      const response = await fetch(`${AUTH_API_BASE}/api/auth/share-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -387,10 +423,11 @@ export default function LoginPage() {
       });
 
       setSuccess(t.shareSuccess);
-      
+
       // Stocker le token et rediriger
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('departement', data.user.departement || selectedDepartment);
       localStorage.setItem('isShared', 'true');
       localStorage.setItem('sharedUntil', data.expiresAt);
 
@@ -405,17 +442,16 @@ export default function LoginPage() {
   };
 
   // Journaliser une connexion
-  const logConnection = async (userId: number, type: string) => {
+  const logConnection = async (userId: number, email: string, departement: string) => {
     try {
-      await fetch('http://localhost:3002/api/logs/connection', {
+      await fetch(`${AUTH_API_BASE}/api/logs/connection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          type,
-          timestamp: new Date().toISOString(),
-          ip: '127.0.0.1', // À remplacer par l'IP réelle
-          userAgent: navigator.userAgent
+          email,
+          departement,
+          success: true
         })
       });
     } catch (err) {
@@ -426,7 +462,7 @@ export default function LoginPage() {
   // Notifier une demande de partage
   const notifyShareRequest = async (data: any) => {
     try {
-      await fetch('http://localhost:3002/api/notifications/share-request', {
+      await fetch(`${AUTH_API_BASE}/api/notifications/share-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -444,11 +480,16 @@ export default function LoginPage() {
   // Notifier une demande de nouveau compte
   const notifyNewAccountRequest = async (userData: any) => {
     try {
-      await fetch('http://localhost:3002/api/notifications/new-account', {
+      await fetch(`${AUTH_API_BASE}/api/notifications/new-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...userData,
+          email: userData.email,
+          nom: userData.nom,
+          prenom: userData.prenom,
+          telephone: userData.telephone,
+          poste: userData.poste,
+          departement: userData.departement,
           requestedBy: email,
           timestamp: new Date().toISOString()
         })
@@ -460,7 +501,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-pink-900 flex flex-col items-center justify-center p-4">
-      
+
       {/* Sélecteur de langue */}
       <div className="absolute top-4 right-4 z-10">
         <div className="bg-white/10 backdrop-blur-md rounded-lg p-1 flex space-x-1">
@@ -498,9 +539,9 @@ export default function LoginPage() {
 
         {/* Messages de succès */}
         {success && (
-          <div className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center space-x-2">
-            <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-            <p className="text-green-300 text-sm">{success}</p>
+          <div className="mb-4 p-4 bg-green-500/20 border border-green-500/30 rounded-lg flex items-start space-x-3">
+            <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+            <div className="text-green-300 text-sm whitespace-pre-line">{success}</div>
           </div>
         )}
 
@@ -514,7 +555,7 @@ export default function LoginPage() {
 
         {/* Carte de connexion */}
         <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20 shadow-2xl">
-          
+
           {/* Sélecteur de mode */}
           <div className="flex space-x-2 mb-6">
             <button
@@ -554,7 +595,7 @@ export default function LoginPage() {
 
           {/* Mode CONNEXION NORMALE */}
           {loginMode === 'normal' && (
-            <div className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleNormalLogin(); }} className="space-y-4">
               <div>
                 <label className="block text-white/80 text-sm mb-2">
                   {t.selectDepartment}
@@ -602,7 +643,7 @@ export default function LoginPage() {
               </div>
 
               <button
-                onClick={handleNormalLogin}
+                type="submit"
                 disabled={loading}
                 className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-white font-medium hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 flex items-center justify-center"
               >
@@ -615,68 +656,79 @@ export default function LoginPage() {
                   </>
                 )}
               </button>
-            </div>
+            </form>
           )}
 
           {/* Mode CRÉATION DE COMPTE */}
           {loginMode === 'create' && (
-            <div className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleCreateAccount(); }} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-white/80 text-sm mb-2">{t.firstName}</label>
+                  <label htmlFor="firstName" className="block text-white/80 text-sm mb-2">{t.firstName}</label>
                   <input
+                    id="firstName"
                     type="text"
                     value={newUser.prenom}
                     onChange={(e) => setNewUser({...newUser, prenom: e.target.value})}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                    placeholder="Jean"
                   />
                 </div>
                 <div>
-                  <label className="block text-white/80 text-sm mb-2">{t.lastName}</label>
+                  <label htmlFor="lastName" className="block text-white/80 text-sm mb-2">{t.lastName}</label>
                   <input
+                    id="lastName"
                     type="text"
                     value={newUser.nom}
                     onChange={(e) => setNewUser({...newUser, nom: e.target.value})}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                    placeholder="Dupont"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-white/80 text-sm mb-2">{t.email}</label>
+                <label htmlFor="email" className="block text-white/80 text-sm mb-2">{t.email}</label>
                 <input
+                  id="email"
                   type="email"
                   value={newUser.email}
                   onChange={(e) => setNewUser({...newUser, email: e.target.value})}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                  placeholder="jean@example.com"
                 />
               </div>
 
               <div>
-                <label className="block text-white/80 text-sm mb-2">{t.phone}</label>
+                <label htmlFor="phone" className="block text-white/80 text-sm mb-2">{t.phone}</label>
                 <input
+                  id="phone"
                   type="tel"
                   value={newUser.telephone}
                   onChange={(e) => setNewUser({...newUser, telephone: e.target.value})}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                  placeholder="+33 6 12 34 56 78"
                 />
               </div>
 
               <div>
-                <label className="block text-white/80 text-sm mb-2">{t.position}</label>
+                <label htmlFor="position" className="block text-white/80 text-sm mb-2">{t.position}</label>
                 <input
+                  id="position"
                   type="text"
                   value={newUser.poste}
                   onChange={(e) => setNewUser({...newUser, poste: e.target.value})}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                  placeholder="Ingénieur"
                 />
               </div>
 
               <div>
-                <label className="block text-white/80 text-sm mb-2">{t.selectDepartment}</label>
+                <label htmlFor="department" className="block text-white/80 text-sm mb-2">{t.selectDepartment}</label>
                 <select
-                  value={newUser.departement}
-                  onChange={(e) => setNewUser({...newUser, departement: e.target.value})}
+                  id="department"
+                  value={selectedDepartment}
+                  onChange={(e) => setSelectedDepartment(e.target.value)}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
                 >
                   <option value="">Sélectionnez...</option>
@@ -687,8 +739,9 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-white/80 text-sm mb-2">{t.password}</label>
+                <label htmlFor="password" className="block text-white/80 text-sm mb-2">{t.password}</label>
                 <input
+                  id="password"
                   type="password"
                   value={newUser.password}
                   onChange={(e) => setNewUser({...newUser, password: e.target.value})}
@@ -753,7 +806,7 @@ export default function LoginPage() {
                     </div>
 
                     {/* Message d'aide */}
-                    {passwordStrength.level === 'moyen' && (
+                    {getPasswordStrength(newUser.password).level === 'moyen' && (
                       <div className="mt-2 p-2 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
                         <p className="text-xs text-yellow-300">
                           ⚠️ Mot de passe moyen. Ajoutez plus de critères pour plus de sécurité.
@@ -761,7 +814,7 @@ export default function LoginPage() {
                       </div>
                     )}
 
-                    {passwordStrength.level === 'faible' && (
+                    {getPasswordStrength(newUser.password).level === 'faible' && (
                       <div className="mt-2 p-2 bg-red-500/20 border border-red-500/30 rounded-lg">
                         <p className="text-xs text-red-300">
                           💡 Conseil: Utilisez un mot de passe comme "MonMot123!" pour plus de sécurité
@@ -773,8 +826,9 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-white/80 text-sm mb-2">{t.confirmPassword}</label>
+                <label htmlFor="confirmPassword" className="block text-white/80 text-sm mb-2">{t.confirmPassword}</label>
                 <input
+                  id="confirmPassword"
                   type="password"
                   value={newUser.confirmPassword}
                   onChange={(e) => setNewUser({...newUser, confirmPassword: e.target.value})}
@@ -794,18 +848,53 @@ export default function LoginPage() {
               </div>
 
               <button
-                onClick={handleCreateAccount}
+                type="submit"
                 disabled={loading || (newUser.password && getPasswordStrength(newUser.password).score < 40) || newUser.password !== newUser.confirmPassword}
                 className="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg text-white font-medium hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 flex items-center justify-center"
               >
                 {loading ? <Loader className="w-5 h-5 animate-spin" /> : t.create}
               </button>
-            </div>
+
+              {/* Checklist de complétion */}
+              <div className="mt-6 p-4 bg-white/5 border border-white/10 rounded-lg">
+                <p className="text-white/80 text-sm font-medium mb-3">Statut du formulaire:</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${newUser.prenom ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                    <span className={newUser.prenom ? 'text-green-300' : 'text-red-300'}>Prénom: {newUser.prenom ? '✅' : '❌'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${newUser.nom ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                    <span className={newUser.nom ? 'text-green-300' : 'text-red-300'}>Nom: {newUser.nom ? '✅' : '❌'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${newUser.email ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                    <span className={newUser.email ? 'text-green-300' : 'text-red-300'}>Email: {newUser.email ? '✅' : '❌'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${newUser.telephone ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                    <span className={newUser.telephone ? 'text-green-300' : 'text-red-300'}>Téléphone: {newUser.telephone ? '✅' : '❌'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${newUser.poste ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                    <span className={newUser.poste ? 'text-green-300' : 'text-red-300'}>Poste: {newUser.poste ? '✅' : '❌'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${selectedDepartment ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                    <span className={selectedDepartment ? 'text-green-300' : 'text-red-300'}>Département: {selectedDepartment ? '✅' : '❌'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${newUser.password && newUser.confirmPassword ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                    <span className={newUser.password && newUser.confirmPassword ? 'text-green-300' : 'text-red-300'}>Mot de passe confirmé: {newUser.password && newUser.confirmPassword ? '✅' : '❌'}</span>
+                  </div>
+                </div>
+              </div>
+            </form>
           )}
 
           {/* Mode PARTAGE DE COMPTE */}
           {loginMode === 'share' && (
-            <div className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleShareAccount(); }} className="space-y-4">
               <div>
                 <label className="block text-white/80 text-sm mb-2">{t.selectDepartment}</label>
                 <select
@@ -897,13 +986,13 @@ export default function LoginPage() {
               </div>
 
               <button
-                onClick={handleShareAccount}
+                type="submit"
                 disabled={loading}
                 className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-white font-medium hover:from-purple-700 hover:to-pink-700 disabled:opacity-50"
               >
                 {loading ? <Loader className="w-5 h-5 animate-spin mx-auto" /> : t.share}
               </button>
-            </div>
+            </form>
           )}
         </div>
       </div>

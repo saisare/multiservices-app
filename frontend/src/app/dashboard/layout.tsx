@@ -1,10 +1,10 @@
 'use client';
 
 import { ReactNode, useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { 
   Menu, X, Home, Users, FileText, Calendar, BarChart3, Shield,
-  Building2, PackageCheck, HardDrive, Hammer
+  Building2, PackageCheck, HardDrive, Hammer, Globe2
 } from "lucide-react";
 import Link from "next/link";
 
@@ -20,12 +20,13 @@ export default function DashboardLayout({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useParams();
-  const department = params.department as string || localStorage.getItem("departement") || "btp";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [department, setDepartment] = useState("btp");
 
 useEffect(() => {
     const token = localStorage.getItem("token");
@@ -35,12 +36,20 @@ useEffect(() => {
       return;
     }
     try {
-      setUser(JSON.parse(u));
+      const parsedUser = JSON.parse(u);
+      setUser(parsedUser);
+      const routeDepartment =
+        (params.department as string) ||
+        pathname.split("/")[2] ||
+        parsedUser?.departement ||
+        localStorage.getItem("departement") ||
+        "btp";
+      setDepartment(routeDepartment);
     } catch {
       router.push("/login");
     }
     setLoading(false);
-  }, []); 
+  }, [params, pathname, router]); 
 
   if (loading) return <div>Loading...</div>;
 
@@ -58,7 +67,10 @@ const deptMenus = {
         { icon: HardDrive, label: "Commandes", href: "/dashboard/btp/commandes" },
       ],
       voyage: [
-        { icon: Users, label: "Réservations", href: "/dashboard/voyage/reservations" },
+        { icon: Users, label: "Clients", href: "/dashboard/voyage/clients" },
+        { icon: Globe2, label: "Destinations", href: "/dashboard/voyage/destinations" },
+        { icon: FileText, label: "Offres", href: "/dashboard/voyage/offre" },
+        { icon: Calendar, label: "Immigration", href: "/dashboard/service-immigration" },
       ],
     }; 
 
@@ -67,19 +79,25 @@ const deptMenus = {
 
   const handleLogout = () => {
     localStorage.clear();
+    // Clear auth cookie
+    document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
     router.push("/login");
   };
 
   const navItems = getNavItems();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen h-screen flex flex-col lg:flex-row overflow-hidden bg-gray-50">
+
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white
-        transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-auto
+        flex-none w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white shadow-xl
+        fixed inset-y-0 left-0 z-50 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:inset-0 lg:h-screen lg:z-auto
         transition-transform duration-300 ease-in-out
       `}>
+
+
+
         <div className="p-6 border-b border-gray-700">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
@@ -128,7 +146,8 @@ const deptMenus = {
       )}
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="flex-1 flex flex-col order-1 lg:order-2">
+
         {/* Header */}
         <header className="sticky top-0 z-40 bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
           <div className="flex items-center justify-between">
@@ -183,11 +202,17 @@ const deptMenus = {
           </div>
         </header>
 
-        <main className="p-6 lg:p-8">
+        <main className="flex-1 min-h-0 p-4 md:p-6 lg:p-8 overflow-y-auto">
           {children}
         </main>
+
+
       </div>
     </div>
   );
+
+
+
+
 }
 

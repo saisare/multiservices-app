@@ -1,7 +1,8 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
+const { verifyToken } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3008;
@@ -16,21 +17,22 @@ const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'multiservices'
+    password: process.env.DB_PASSWORD || undefined,
+    database: process.env.DB_NAME || 'auth_db',
+    charset: 'utf8mb4'
 });
 
 db.connect(err => {
     if (err) {
-        console.error('❌ Erreur connexion MySQL:', err);
+        console.error('âŒ Erreur connexion MySQL:', err);
         process.exit(1);
     }
-    console.log(`✅ Connecté à MySQL (${process.env.DB_NAME})`);
+    console.log(`âœ… ConnectÃ© Ã  MySQL (${process.env.DB_NAME})`);
 });
 
-// Middleware d'authentification (simplifié pour le moment)
+// Middleware d'authentification (simplifiÃ© pour le moment)
 const authMiddleware = (req, res, next) => {
-    // À implémenter avec JWT plus tard
+    // Ã€ implÃ©menter avec JWT plus tard
     next();
 };
 
@@ -53,7 +55,7 @@ app.get('/health', (req, res) => {
 // ===========================================
 
 // GET /api/produits - Liste tous les produits
-app.get('/api/produits', (req, res) => {
+app.get('/api/produits', verifyToken, (req, res) => {
     const sql = 'SELECT * FROM produits ORDER BY nom';
     
     db.query(sql, (err, results) => {
@@ -65,8 +67,8 @@ app.get('/api/produits', (req, res) => {
     });
 });
 
-// GET /api/produits/:id - Détail d'un produit
-app.get('/api/produits/:id', (req, res) => {
+// GET /api/produits/:id - Detail d'un produit
+app.get('/api/produits/:id', verifyToken, (req, res) => {
     const sql = 'SELECT * FROM produits WHERE id = ?';
     
     db.query(sql, [req.params.id], (err, results) => {
@@ -74,14 +76,14 @@ app.get('/api/produits/:id', (req, res) => {
             return res.status(500).json({ error: err.message });
         }
         if (results.length === 0) {
-            return res.status(404).json({ error: 'Produit non trouvé' });
+            return res.status(404).json({ error: 'Produit non trouvÃ©' });
         }
         res.json(results[0]);
     });
 });
 
 // POST /api/produits - Ajouter un produit
-app.post('/api/produits', (req, res) => {
+app.post('/api/produits', verifyToken, (req, res) => {
     const { code_produit, nom, categorie, fournisseur, quantite, seuil_alerte, prix_unitaire, localisation } = req.body;
     
     // Validation
@@ -97,20 +99,20 @@ app.post('/api/produits', (req, res) => {
         (err, result) => {
             if (err) {
                 if (err.code === 'ER_DUP_ENTRY') {
-                    return res.status(400).json({ error: 'Code produit déjà existant' });
+                    return res.status(400).json({ error: 'Code produit dÃ©jÃ  existant' });
                 }
                 return res.status(500).json({ error: err.message });
             }
             res.status(201).json({
                 id: result.insertId,
-                message: 'Produit ajouté avec succès'
+                message: 'Produit ajoutÃ© avec succÃ¨s'
             });
         }
     );
 });
 
 // PUT /api/produits/:id - Modifier un produit
-app.put('/api/produits/:id', (req, res) => {
+app.put('/api/produits/:id', verifyToken, (req, res) => {
     const { nom, categorie, fournisseur, quantite, seuil_alerte, prix_unitaire, localisation } = req.body;
     
     const sql = `UPDATE produits 
@@ -125,15 +127,15 @@ app.put('/api/produits/:id', (req, res) => {
                 return res.status(500).json({ error: err.message });
             }
             if (result.affectedRows === 0) {
-                return res.status(404).json({ error: 'Produit non trouvé' });
+                return res.status(404).json({ error: 'Produit non trouvÃ©' });
             }
-            res.json({ message: 'Produit modifié avec succès' });
+            res.json({ message: 'Produit modifiÃ© avec succÃ¨s' });
         }
     );
 });
 
 // DELETE /api/produits/:id - Supprimer un produit
-app.delete('/api/produits/:id', (req, res) => {
+app.delete('/api/produits/:id', verifyToken, (req, res) => {
     const sql = 'DELETE FROM produits WHERE id = ?';
     
     db.query(sql, [req.params.id], (err, result) => {
@@ -141,25 +143,25 @@ app.delete('/api/produits/:id', (req, res) => {
             return res.status(500).json({ error: err.message });
         }
         if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Produit non trouvé' });
+            return res.status(404).json({ error: 'Produit non trouvÃ©' });
         }
-        res.json({ message: 'Produit supprimé avec succès' });
+        res.json({ message: 'Produit supprimÃ© avec succÃ¨s' });
     });
 });
 
 // ===========================================
-// ROUTES STOCK (ENTRÉES/SORTIES)
+// ROUTES STOCK (ENTRÃ‰ES/SORTIES)
 // ===========================================
 
-// POST /api/entrees - Ajouter une entrée de stock
-app.post('/api/entrees', (req, res) => {
+// POST /api/entrees - Ajouter une entree de stock
+app.post('/api/entrees', verifyToken, (req, res) => {
     const { produit_id, fournisseur_id, quantite, prix_unitaire_achat, numero_bon_livraison, date_entree, notes } = req.body;
     
     // Commencer une transaction
     db.beginTransaction(err => {
         if (err) return res.status(500).json({ error: err.message });
         
-        // 1. Ajouter l'entrée
+        // 1. Ajouter l'entrÃ©e
         const sql1 = `INSERT INTO entrees_stock 
                       (produit_id, fournisseur_id, quantite, prix_unitaire_achat, numero_bon_livraison, date_entree, notes) 
                       VALUES (?, ?, ?, ?, ?, ?, ?)`;
@@ -169,7 +171,7 @@ app.post('/api/entrees', (req, res) => {
                 return db.rollback(() => res.status(500).json({ error: err.message }));
             }
             
-            // 2. Mettre à jour le stock
+            // 2. Mettre Ã  jour le stock
             const sql2 = 'UPDATE produits SET quantite = quantite + ? WHERE id = ?';
             
             db.query(sql2, [quantite, produit_id], (err, result2) => {
@@ -177,7 +179,7 @@ app.post('/api/entrees', (req, res) => {
                     return db.rollback(() => res.status(500).json({ error: err.message }));
                 }
                 
-                // 3. Vérifier le seuil d'alerte
+                // 3. VÃ©rifier le seuil d'alerte
                 const sql3 = 'SELECT quantite, seuil_alerte FROM produits WHERE id = ?';
                 
                 db.query(sql3, [produit_id], (err, results) => {
@@ -191,7 +193,7 @@ app.post('/api/entrees', (req, res) => {
                                       VALUES (?, ?, ?)`;
                         
                         db.query(sql4, [produit_id, produit.quantite, produit.seuil_alerte], (err) => {
-                            if (err) console.error('Erreur création alerte:', err);
+                            if (err) console.error('Erreur crÃ©ation alerte:', err);
                         });
                     }
                     
@@ -199,7 +201,7 @@ app.post('/api/entrees', (req, res) => {
                         if (err) {
                             return db.rollback(() => res.status(500).json({ error: err.message }));
                         }
-                        res.status(201).json({ message: 'Entrée enregistrée avec succès' });
+                        res.status(201).json({ message: 'EntrÃ©e enregistrÃ©e avec succÃ¨s' });
                     });
                 });
             });
@@ -208,13 +210,13 @@ app.post('/api/entrees', (req, res) => {
 });
 
 // POST /api/sorties - Ajouter une sortie de stock
-app.post('/api/sorties', (req, res) => {
+app.post('/api/sorties', verifyToken, (req, res) => {
     const { produit_id, quantite, destinataire, type_sortie, numero_commande, date_sortie, notes } = req.body;
     
     db.beginTransaction(err => {
         if (err) return res.status(500).json({ error: err.message });
         
-        // 1. Vérifier le stock disponible
+        // 1. VÃ©rifier le stock disponible
         const sql0 = 'SELECT quantite FROM produits WHERE id = ?';
         
         db.query(sql0, [produit_id], (err, results) => {
@@ -241,7 +243,7 @@ app.post('/api/sorties', (req, res) => {
                     return db.rollback(() => res.status(500).json({ error: err.message }));
                 }
                 
-                // 3. Mettre à jour le stock
+                // 3. Mettre Ã  jour le stock
                 const sql2 = 'UPDATE produits SET quantite = quantite - ? WHERE id = ?';
                 
                 db.query(sql2, [quantite, produit_id], (err) => {
@@ -253,7 +255,7 @@ app.post('/api/sorties', (req, res) => {
                         if (err) {
                             return db.rollback(() => res.status(500).json({ error: err.message }));
                         }
-                        res.status(201).json({ message: 'Sortie enregistrée avec succès' });
+                        res.status(201).json({ message: 'Sortie enregistrÃ©e avec succÃ¨s' });
                     });
                 });
             });
@@ -261,8 +263,8 @@ app.post('/api/sorties', (req, res) => {
     });
 });
 
-// GET /api/entrees - Historique des entrées
-app.get('/api/entrees', (req, res) => {
+// GET /api/entrees - Historique des entrees
+app.get('/api/entrees', verifyToken, (req, res) => {
     const sql = `SELECT e.*, p.nom as produit_nom, f.nom as fournisseur_nom
                  FROM entrees_stock e
                  JOIN produits p ON e.produit_id = p.id
@@ -277,7 +279,7 @@ app.get('/api/entrees', (req, res) => {
 });
 
 // GET /api/sorties - Historique des sorties
-app.get('/api/sorties', (req, res) => {
+app.get('/api/sorties', verifyToken, (req, res) => {
     const sql = `SELECT s.*, p.nom as produit_nom
                  FROM sorties_stock s
                  JOIN produits p ON s.produit_id = p.id
@@ -294,14 +296,14 @@ app.get('/api/sorties', (req, res) => {
 // ROUTES COMMANDES
 // ===========================================
 
-// POST /api/commandes - Créer une commande
-app.post('/api/commandes', (req, res) => {
+// POST /api/commandes - Creer une commande
+app.post('/api/commandes', verifyToken, (req, res) => {
     const { client_nom, client_adresse, client_telephone, date_livraison_souhaitee, lignes } = req.body;
     
     db.beginTransaction(err => {
         if (err) return res.status(500).json({ error: err.message });
         
-        // Générer numéro commande
+        // GÃ©nÃ©rer numÃ©ro commande
         const sqlNum = "SELECT CONCAT('CMD-', DATE_FORMAT(NOW(), '%Y%m'), '-', LPAD(COUNT(*)+1, 4, '0')) as numero FROM commandes WHERE MONTH(date_commande) = MONTH(NOW())";
         
         db.query(sqlNum, (err, numResult) => {
@@ -319,7 +321,7 @@ app.post('/api/commandes', (req, res) => {
             const tva = total_ht * 0.20;
             const total_ttc = total_ht + tva;
             
-            // Insérer commande
+            // InsÃ©rer commande
             const sql1 = `INSERT INTO commandes 
                           (numero_commande, client_nom, client_adresse, client_telephone, date_livraison_souhaitee, total_ht, tva, total_ttc) 
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
@@ -332,7 +334,7 @@ app.post('/api/commandes', (req, res) => {
                     
                     const commande_id = result.insertId;
                     
-                    // Insérer les lignes
+                    // InsÃ©rer les lignes
                     let lignesOk = 0;
                     lignes.forEach((ligne, index) => {
                         const sql2 = `INSERT INTO lignes_commande (commande_id, produit_id, quantite, prix_unitaire) 
@@ -351,7 +353,7 @@ app.post('/api/commandes', (req, res) => {
                                     }
                                     res.status(201).json({
                                         numero_commande,
-                                        message: 'Commande créée avec succès'
+                                        message: 'Commande crÃ©Ã©e avec succÃ¨s'
                                     });
                                 });
                             }
@@ -364,7 +366,7 @@ app.post('/api/commandes', (req, res) => {
 });
 
 // GET /api/commandes - Liste des commandes
-app.get('/api/commandes', (req, res) => {
+app.get('/api/commandes', verifyToken, (req, res) => {
     const sql = `SELECT c.*, 
                         COUNT(lc.id) as nb_lignes,
                         lv.statut as statut_livraison
@@ -380,8 +382,8 @@ app.get('/api/commandes', (req, res) => {
     });
 });
 
-// GET /api/commandes/:id - Détail d'une commande
-app.get('/api/commandes/:id', (req, res) => {
+// GET /api/commandes/:id - DÃ©tail d'une commande
+app.get('/api/commandes/:id', verifyToken, (req, res) => {
     const sql1 = 'SELECT * FROM commandes WHERE id = ?';
     const sql2 = `SELECT lc.*, p.nom as produit_nom 
                   FROM lignes_commande lc
@@ -390,7 +392,7 @@ app.get('/api/commandes/:id', (req, res) => {
     
     db.query(sql1, [req.params.id], (err, commande) => {
         if (err) return res.status(500).json({ error: err.message });
-        if (commande.length === 0) return res.status(404).json({ error: 'Commande non trouvée' });
+        if (commande.length === 0) return res.status(404).json({ error: 'Commande non trouvÃ©e' });
         
         db.query(sql2, [req.params.id], (err, lignes) => {
             if (err) return res.status(500).json({ error: err.message });
@@ -407,8 +409,8 @@ app.get('/api/commandes/:id', (req, res) => {
 // ROUTES STATISTIQUES
 // ===========================================
 
-// GET /api/stats - Statistiques générales
-app.get('/api/stats', (req, res) => {
+// GET /api/stats - Statistiques gÃ©nÃ©rales
+app.get('/api/stats', verifyToken, (req, res) => {
     const stats = {};
     
     db.query('SELECT COUNT(*) as total FROM produits', (err, result) => {
@@ -435,12 +437,13 @@ app.get('/api/stats', (req, res) => {
 });
 
 // ===========================================
-// DÉMARRAGE DU SERVEUR
+// DÃ‰MARRAGE DU SERVEUR
 // ===========================================
-app.listen(PORT, () => {
-    console.log(`\n🚀 SERVICE LOGISTIQUE DÉMARRÉ`);
-    console.log(`📡 URL: http://localhost:${PORT}`);
-    console.log(`🔍 Health: http://localhost:${PORT}/health`);
-    console.log(`📦 Produits: http://localhost:${PORT}/api/produits`);
-    console.log(`✅ Prêt à recevoir des requêtes\n`);
+app.listen(PORT, process.env.HOST || '0.0.0.0', () => {
+    console.log(`\nðŸš€ SERVICE LOGISTIQUE DÃ‰MARRÃ‰`);
+    console.log(`ðŸ“¡ URL: http://localhost:${PORT}`);
+    console.log(`ðŸ” Health: http://localhost:${PORT}/health`);
+    console.log(`ðŸ“¦ Produits: http://localhost:${PORT}/api/produits`);
+    console.log(`âœ… PrÃªt Ã  recevoir des requÃªtes\n`);
 });
+

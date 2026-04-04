@@ -21,8 +21,9 @@ const db = mysql.createConnection({
   host: process.env.DB_HOST || 'localhost',
   port: process.env.DB_PORT || 3306,
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'auth_db'
+  password: process.env.DB_PASSWORD || undefined,
+  database: process.env.DB_NAME || 'auth_db',
+  charset: 'utf8mb4'
 });
 
 db.connect(err => {
@@ -63,9 +64,8 @@ app.get('/health', (req, res) => {
   res.json({ service: 'auth', status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// ============ LOGIN & AUTH ============
+// ============ LOGIN ============
 
-// Login endpoint
 app.post('/api/auth/login', async (req, res) => {
   const { email, password, departement } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
@@ -124,9 +124,8 @@ app.post('/api/auth/login', async (req, res) => {
   });
 });
 
-// ============ ACCOUNT CREATION ============
+// ============ REGISTRATION (Direct to Users Table) ============
 
-// Créer un compte (inscription) - status pending
 app.post('/api/auth/request-account', async (req, res) => {
   const { email, password, nom, prenom, telephone, poste, departement } = req.body;
 
@@ -134,28 +133,71 @@ app.post('/api/auth/request-account', async (req, res) => {
     return res.status(400).json({ error: 'Champs obligatoires manquants' });
   }
 
-  db.query('SELECT id FROM users WHERE email = ?', [email], async (err, results) => {
+  // Check if user already exists
+  db.query('SELECT id FROM users WHERE email = ?', [email], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     if (results.length) return res.status(409).json({ error: 'Cet email est déjà utilisé' });
 
-    // Stockage en clair (pas d'obligation de hash en création)
-    const plainPassword = password;
-
+    // Insert directly into users table (plaintext password for now, user is inactive)
+    const matricule = `USER-${Date.now()}`;
     db.query(
-      `INSERT INTO pending_users (email, nom, prenom, telephone, poste, departement, password_hash, status, requested_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())`,
-      [email, nom, prenom, telephone || '', poste || '', departement, plainPassword],
-      (err2, result) => {
-        if (err2) {
-          if (err2.code === 'ER_DUP_ENTRY') {
+      `INSERT INTO users (matricule, nom, prenom, email, telephone, departement, poste, role, password_hash, actif, hidden, date_creation)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, NOW())`,
+      [matricule, nom, prenom, email, telephone || '', departement, poste || '', 'employee', password],
+      (err, result) => {
+        if (err) {
+          if (err.code === 'ER_DUP_ENTRY') {
             return res.status(409).json({ error: 'Cet email a déjà une demande en attente' });
           }
-          return res.status(500).json({ error: err2.message });
+          return res.status(500).json({ error: err.message });
         }
+
+        const newUserId = result.insertId;
+
+        // 📨 CREATE NOTIFICATION FOR ADMIN
+        const notificationTitle = `📝 Nouvelle demande de création de compte`;
+        const notificationMessage = `
+${prenom} ${nom} a demandé la création d'un compte.
+
+Email: ${email}
+Département: ${departement}
+Poste: ${poste || 'Non spécifié'}
+Téléphone: ${telephone || 'Non spécifié'}
+
+Action requise: Veuillez approuver ou rejeter cette demande dans le dashboard admin.
+`;
+
+        db.query(
+          `INSERT INTO notifications (type, title, message, data, created_at)
+           VALUES ('new_user_request', ?, ?, ?, NOW())`,
+          [
+            notificationTitle,
+            notificationMessage,
+            JSON.stringify({
+              userId: newUserId,
+              email: email,
+              nom: nom,
+              prenom: prenom,
+              departement: departement,
+              poste: poste,
+              telephone: telephone,
+              type: 'new_user_request'
+            })
+          ],
+          (notifErr) => {
+            if (notifErr) {
+              console.warn('⚠️ Notification creation failed:', notifErr.message);
+              // Don't fail registration if notification fails
+            } else {
+              console.log('✅ Notification created for new user request');
+            }
+          }
+        );
+
         res.status(201).json({
           success: true,
-          message: 'Compte créé avec succès. En attente de validation.',
-          user: { id: result.insertId, email, nom, prenom, departement, status: 'pending' }
+          message: 'Compte créé avec succès!\n\nVotre demande a été enregistrée et est en attente de validation par l\'administration.\n\nUn administrateur a reçu une notification et examinera votre demande bientôt.',
+          user: { id: newUserId, email, nom, prenom, departement, status: 'pending' }
         });
       }
     );
@@ -164,13 +206,12 @@ app.post('/api/auth/request-account', async (req, res) => {
 
 // ============ USER MANAGEMENT (ADMIN) ============
 
-// Liste utilisateurs (admin/directeur/secretaire)
+// List all users
 app.get('/api/auth/users', verifyToken, requireRole(ROLE_ADMIN, ROLE_DIRECTOR, ROLE_SECRETAIRE), (req, res) => {
-  db.query('SELECT id, matricule, nom, prenom, email, departement, role, actif, hidden FROM users', (err, results) => {
+  db.query('SELECT id, nom, prenom, email, departement, role, actif, hidden FROM users', (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
-    
+
     if (req.user.role === ROLE_DIRECTOR) {
-      // Directeur ne voit pas les comptes cachés
       res.json(results.filter(user => !user.hidden));
     } else {
       res.json(results);
@@ -178,9 +219,28 @@ app.get('/api/auth/users', verifyToken, requireRole(ROLE_ADMIN, ROLE_DIRECTOR, R
   });
 });
 
-// Créer un utilisateur directement (admin/secretaire)
+// List pending users (users with actif = 0)
+app.get('/api/auth/pending-users', verifyToken, requireRole(ROLE_ADMIN, ROLE_SECRETAIRE), (req, res) => {
+  db.query(
+    `SELECT id, email, nom, prenom, telephone, poste, departement, date_creation as requested_at
+     FROM users
+     WHERE actif = 0 AND hidden = 0
+     ORDER BY date_creation DESC`,
+    (err, users) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      res.status(200).json({
+        success: true,
+        count: users.length,
+        users
+      });
+    }
+  );
+});
+
+// Create user directly (admin/secretaire)
 app.post('/api/auth/users', verifyToken, requireRole(ROLE_ADMIN, ROLE_SECRETAIRE), (req, res) => {
-  const { matricule, nom, prenom, email, telephone, departement, poste, role, password } = req.body;
+  const { nom, prenom, email, telephone, departement, poste, role, password } = req.body;
   if (!email || !password || !nom || !prenom || !departement || !role) {
     return res.status(400).json({ error: 'Champs obligatoires manquants' });
   }
@@ -190,20 +250,69 @@ app.post('/api/auth/users', verifyToken, requireRole(ROLE_ADMIN, ROLE_SECRETAIRE
     if (results.length) return res.status(409).json({ error: 'Utilisateur déjà existant' });
 
     db.query(
-      'INSERT INTO users (matricule, nom, prenom, email, telephone, departement, poste, role, password_hash, actif, hidden, date_creation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, NOW())',
-      [matricule || '', nom, prenom, email, telephone || '', departement, poste || '', role, password],
-      (err2, result) => {
-        if (err2) return res.status(500).json({ error: err2.message });
+      'INSERT INTO users (nom, prenom, email, telephone, departement, poste, role, password_hash, actif, hidden, date_creation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, NOW())',
+      [nom, prenom, email, telephone || '', departement, poste || '', role, password],
+      (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
         res.status(201).json({
           success: true,
-          user: { id: result.insertId, matricule, nom, prenom, email, departement, role }
+          user: { id: result.insertId, nom, prenom, email, departement, role }
         });
       }
     );
   });
 });
 
-// Cacher/afficher un utilisateur (soft delete)
+// Approve user (activate and hash password)
+app.patch('/api/auth/users/:id/approve', verifyToken, requireRole(ROLE_ADMIN, ROLE_SECRETAIRE), async (req, res) => {
+  const userId = parseInt(req.params.id);
+
+  db.query('SELECT * FROM users WHERE id = ?', [userId], async (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!results.length) return res.status(404).json({ error: 'User not found' });
+
+    const user = results[0];
+    const plainPassword = user.password_hash;
+
+    // Hash the password
+    try {
+      const salt = bcrypt.genSaltSync(10);
+      const hashedPassword = bcrypt.hashSync(plainPassword, salt);
+
+      db.query(
+        'UPDATE users SET password_hash = ?, actif = 1 WHERE id = ?',
+        [hashedPassword, userId],
+        (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+
+          res.status(200).json({
+            success: true,
+            message: 'Utilisateur approuvé avec succès',
+            user: { id: user.id, email: user.email, nom: user.nom, prenom: user.prenom }
+          });
+        }
+      );
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+});
+
+// Reject user (delete from users)
+app.patch('/api/auth/users/:id/reject', verifyToken, requireRole(ROLE_ADMIN, ROLE_SECRETAIRE), (req, res) => {
+  const userId = parseInt(req.params.id);
+  const { reason } = req.body;
+
+  db.query('DELETE FROM users WHERE id = ? AND actif = 0', [userId], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.status(200).json({
+      success: true,
+      message: 'Demande rejetée'
+    });
+  });
+});
+
+// Hide/show user
 app.patch('/api/auth/users/:id/hide', verifyToken, requireRole(ROLE_ADMIN, ROLE_DIRECTOR), (req, res) => {
   const { id } = req.params;
   const { hidden } = req.body;
@@ -213,7 +322,7 @@ app.patch('/api/auth/users/:id/hide', verifyToken, requireRole(ROLE_ADMIN, ROLE_
   });
 });
 
-// Supprimer un utilisateur définitivement (admin seulement)
+// Delete user permanently
 app.delete('/api/auth/users/:id', verifyToken, requireRole(ROLE_ADMIN), (req, res) => {
   const { id } = req.params;
   db.query('DELETE FROM users WHERE id = ?', [id], (err) => {
@@ -222,7 +331,7 @@ app.delete('/api/auth/users/:id', verifyToken, requireRole(ROLE_ADMIN), (req, re
   });
 });
 
-// Activer/désactiver un utilisateur
+// Activate/deactivate user
 app.patch('/api/auth/users/:id/activate', verifyToken, requireRole(ROLE_ADMIN, ROLE_SECRETAIRE), (req, res) => {
   const { id } = req.params;
   const { actif } = req.body;
@@ -232,119 +341,163 @@ app.patch('/api/auth/users/:id/activate', verifyToken, requireRole(ROLE_ADMIN, R
   });
 });
 
-// ============ PASSWORD MANAGEMENT ============
-
-// Changer le mot de passe de l'admin (endpoint interne)
-app.post('/api/auth/set-admin-password', async (req, res) => {
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ error: 'Mot de passe requis' });
-
-  // Hash le password si non fourni en hash
-  let passwordToStore = password;
-  if (!password.startsWith('$2')) {
-    passwordToStore = password;
-  }
-
-  db.query('UPDATE users SET password_hash = ? WHERE role = ?', [passwordToStore, ROLE_ADMIN], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true, message: 'Mot de passe admin mis à jour', affectedRows: result.affectedRows });
-  });
-});
-
-// Corriger les mots de passe existants (admin seulement)
-app.post('/api/auth/fix-passwords', verifyToken, requireRole(ROLE_ADMIN), async (req, res) => {
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ error: 'Mot de passe requis' });
-
-  db.query('UPDATE users SET password_hash = ? WHERE role != ?', [password, ROLE_ADMIN], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({
-      success: true,
-      message: `Mots de passe corrigés pour ${result.affectedRows} utilisateurs`,
-      affectedRows: result.affectedRows
-    });
-  });
-});
-
 // ============ NOTIFICATIONS ============
 
-// Nouvelle notification (appelée depuis frontend)
-app.post('/api/notifications/new-account', (req, res) => {
-  const { email, nom, departement } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email requis' });
-
+// Get notifications for admin
+app.get('/api/auth/notifications', verifyToken, requireRole(ROLE_ADMIN, ROLE_SECRETAIRE), (req, res) => {
   db.query(
-    `INSERT INTO notifications (type, recipient_id, title, message, data, created_at)
-     VALUES ('new_account_request', NULL, ?, ?, ?, NOW())`,
-    [
-      `Nouvelle demande de compte: ${nom}`,
-      `Demande pour ${email} (${departement})`,
-      JSON.stringify({ email, nom, departement })
-    ],
-    (err) => {
+    `SELECT id, type, title, message, data, created_at, is_read
+     FROM notifications
+     WHERE type = 'new_user_request'
+     ORDER BY created_at DESC
+     LIMIT 50`,
+    (err, notifications) => {
       if (err) {
-        console.error('Notification insert failed:', err);
-        // Ne pas bloquer si notifications table n'existe pas
-        return res.status(200).json({ success: true, message: 'Account request created (notification system pending)' });
+        console.warn('⚠️ Notifications query failed:', err.message);
+        return res.status(200).json({ success: true, notifications: [] });
       }
-      res.json({ success: true, message: 'Notification envoyée aux administrateurs.' });
+
+      // Parse JSON data for each notification
+      const parsed = (notifications || []).map(notif => ({
+        ...notif,
+        data: notif.data ? JSON.parse(notif.data) : {}
+      }));
+
+      res.json({
+        success: true,
+        count: parsed.length,
+        notifications: parsed
+      });
     }
   );
 });
 
-// Envoyer une notification interne entre rôles
-app.post('/api/auth/notifications', verifyToken, (req, res) => {
-  const { destinataireRole, message } = req.body;
-  if (!destinataireRole || !message) return res.status(400).json({ error: 'destinataireRole et message requis' });
+// Mark notification as read
+app.patch('/api/auth/notifications/:id/read', verifyToken, requireRole(ROLE_ADMIN, ROLE_SECRETAIRE), (req, res) => {
+  const notifId = parseInt(req.params.id);
 
-  // Règles
-  if (req.user.role === ROLE_DIRECTOR && destinataireRole !== ROLE_ADMIN) {
-    return res.status(403).json({ error: 'Directeur ne peut envoyer qu\'au rôle admin' });
+  db.query(
+    'UPDATE notifications SET is_read = 1 WHERE id = ?',
+    [notifId],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, message: 'Notification marked as read' });
+    }
+  );
+});
+
+// Get pending users with notification details
+app.get('/api/auth/pending-users-with-notifications', verifyToken, requireRole(ROLE_ADMIN, ROLE_SECRETAIRE), (req, res) => {
+  db.query(
+    `SELECT
+      u.id,
+      u.email,
+      u.nom,
+      u.prenom,
+      u.telephone,
+      u.poste,
+      u.departement,
+      u.date_creation as requested_at,
+      n.id as notification_id,
+      n.created_at as notified_at
+     FROM users u
+     LEFT JOIN notifications n ON n.data LIKE CONCAT('%', u.id, '%') AND n.type = 'new_user_request'
+     WHERE u.actif = 0 AND u.hidden = 0
+     ORDER BY u.date_creation DESC`,
+    (err, users) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      res.status(200).json({
+        success: true,
+        count: users.length,
+        users: users.map(user => ({
+          ...user,
+          has_notification: !!user.notification_id
+        }))
+      });
+    }
+  );
+});
+
+// ============ PASSWORD MANAGEMENT ============
+
+// Change password
+app.post('/api/auth/change-password', verifyToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current and new password required' });
   }
 
-  db.query(
-    `INSERT INTO notifications (type, recipient_id, sender_id, title, message, data, created_at)
-     VALUES ('internal_message', NULL, ?, ?, ?, ?, NOW())`,
-    [
-      req.user.id,
-      `Message ${req.user.role} -> ${destinataireRole}`,
-      message,
-      JSON.stringify({ senderRole: req.user.role, destinataireRole, senderId: req.user.id })
-    ],
-    (err) => {
-      if (err) {
-        console.error('Notification insert failed:', err);
-        return res.status(200).json({ success: true, message: 'Message logged' });
-      }
-      res.json({ success: true, message: 'Notification envoyée.' });
+  db.query('SELECT password_hash FROM users WHERE id = ?', [req.user.id], async (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!results.length) return res.status(404).json({ error: 'User not found' });
+
+    const user = results[0];
+    let validPassword = false;
+
+    if (user.password_hash.startsWith('$2')) {
+      validPassword = await bcrypt.compare(currentPassword, user.password_hash);
+    } else {
+      validPassword = currentPassword === user.password_hash;
     }
-  );
+
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const hashedPassword = bcrypt.hashSync(newPassword, salt);
+
+    db.query(
+      'UPDATE users SET password_hash = ? WHERE id = ?',
+      [hashedPassword, req.user.id],
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, message: 'Password changed successfully' });
+      }
+    );
+  });
 });
 
-// Récupérer les notifications pour l'utilisateur
-app.get('/api/auth/notifications', verifyToken, (req, res) => {
-  db.query(
-    `SELECT * FROM notifications 
-     WHERE (recipient_id IS NULL OR recipient_id = ?) OR sender_id = ?
-     ORDER BY created_at DESC LIMIT 50`,
-    [req.user.id, req.user.id],
-    (err, results) => {
-      if (err) {
-        console.error('Notifications fetch failed:', err);
-        return res.json([]);
-      }
-      res.json(results || []);
-    }
-  );
+// Get user profile
+app.get('/api/auth/me', verifyToken, (req, res) => {
+  db.query('SELECT id, email, role, departement, nom, prenom FROM users WHERE id = ?', [req.user.id], (err, results) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!results.length) return res.status(404).json({ error: 'User not found' });
+    res.json(results[0]);
+  });
 });
 
-// ============ DEBUG / TEST ============
+// Update user profile
+app.patch('/api/auth/me', verifyToken, (req, res) => {
+  const { telephone, langue } = req.body;
+  let updates = [];
+  let values = [];
 
-app.get('/test', (req, res) => { res.json({ message: 'Test OK' }); });
+  if (telephone !== undefined) {
+    updates.push('telephone = ?');
+    values.push(telephone);
+  }
+  if (langue !== undefined) {
+    updates.push('langue = ?');
+    values.push(langue);
+  }
 
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  values.push(req.user.id);
+  const sql = `UPDATE users SET ${updates.join(', ')} WHERE id = ?`;
+
+  db.query(sql, values, (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, message: 'Profil mis à jour' });
+  });
+});
+
+// Start server
 app.listen(PORT, () => {
-  console.log('\n✅ SERVICE AUTH DÉMARRÉ');
-  console.log('📍 URL: http://localhost:' + PORT);
-  console.log('📍 Health: http://localhost:' + PORT + '/health');
-  console.log('📍 Login: http://localhost:' + PORT + '/api/auth/login');
+  console.log(`✅ Auth service running on port ${PORT}`);
 });

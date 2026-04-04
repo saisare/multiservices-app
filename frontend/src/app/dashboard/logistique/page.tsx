@@ -1,8 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Package, Truck, AlertTriangle, TrendingUp, Plus, Search, Filter } from 'lucide-react';
 import Link from 'next/link';
+import { logistiqueApi, type Stats } from '@/services/api/logistique.api.ts';
+
+interface LocalStats {
+  totalProduits: number;
+  produitsFaibleStock: number;
+  valeurStock: number;
+  commandesEnCours: number;
+}
 
 export default function LogistiquePage() {
   const [stats, setStats] = useState({
@@ -13,20 +21,28 @@ export default function LogistiquePage() {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulation de chargement des données
-    const timer = setTimeout(() => {
+const loadStats = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await logistiqueApi.getStats();
       setStats({
-        totalProduits: 25,
-        produitsFaibleStock: 3,
-        valeurStock: 150000,
-        commandesEnCours: 8
+        totalProduits: data.total_produits || 0,
+        produitsFaibleStock: data.alertes_non_traitees || 0,
+        valeurStock: data.valeur_stock || 0,
+        commandesEnCours: data.commandes_en_cours || 0
       });
+    } catch (err) {
+      console.error('Error loading stats:', err);
+      // Fallback
+      setStats({ totalProduits: 0, produitsFaibleStock: 0, valeurStock: 0, commandesEnCours: 0 });
+    } finally {
       setLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
+    }
   }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   if (loading) {
     return (

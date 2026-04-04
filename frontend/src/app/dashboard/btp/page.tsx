@@ -44,11 +44,11 @@ export default function BTPDashboard() {
 
   const getStatutColor = (statut: string) => {
     switch (statut) {
-      case 'EN_COURS': return 'bg-blue-100 text-blue-700';
-      case 'TERMINE': return 'bg-green-100 text-green-700';
-      case 'SUSPENDU': return 'bg-yellow-100 text-yellow-700';
-      case 'ANNULE': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'EN_COURS': return 'bg-orange-100 text-orange-800';
+      case 'TERMINE': return 'bg-emerald-100 text-emerald-700';
+      case 'SUSPENDU': return 'bg-amber-100 text-amber-800';
+      case 'ANNULE': return 'bg-rose-100 text-rose-700';
+      default: return 'bg-stone-100 text-stone-700';
     }
   };
 
@@ -73,7 +73,7 @@ export default function BTPDashboard() {
         </div>
         <Link
           href="/dashboard/btp/chantiers/nouveau"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center"
         >
           <Plus className="w-4 h-4 mr-2" />
           Nouveau chantier
@@ -88,9 +88,9 @@ export default function BTPDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-white rounded-xl border border-orange-100 p-6">
           <div className="flex items-center justify-between">
-            <Building2 className="w-8 h-8 text-blue-500" />
+            <Building2 className="w-8 h-8 text-orange-500" />
             <span className="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded-full">
               {stats?.chantiers || chantiers.length}
             </span>
@@ -98,7 +98,7 @@ export default function BTPDashboard() {
           <p className="text-2xl font-bold mt-2">{chantiers.length}</p>
           <p className="text-sm text-gray-600">Chantiers actifs</p>
         </div>
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-white rounded-xl border border-orange-100 p-6">
           <div className="flex items-center justify-between">
             <Package className="w-8 h-8 text-green-500" />
             <span className="text-xs font-medium px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full">
@@ -108,7 +108,7 @@ export default function BTPDashboard() {
           <p className="text-2xl font-bold mt-2">{materiaux.length}</p>
           <p className="text-sm text-gray-600">Matériaux en stock</p>
         </div>
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-white rounded-xl border border-orange-100 p-6">
           <div className="flex items-center justify-between">
             <Users className="w-8 h-8 text-purple-500" />
             <span className="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded-full">
@@ -118,7 +118,7 @@ export default function BTPDashboard() {
           <p className="text-2xl font-bold mt-2">{ouvriers.length}</p>
           <p className="text-sm text-gray-600">Ouvriers</p>
         </div>
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-white rounded-xl border border-orange-100 p-6">
           <div className="flex items-center justify-between">
             <TrendingUp className="w-8 h-8 text-orange-500" />
             <span className="text-xs font-medium px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
@@ -130,10 +130,10 @@ export default function BTPDashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border p-6">
+      <div className="bg-white rounded-xl border border-orange-100 p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Chantiers récents</h2>
-          <Link href="/dashboard/btp/chantiers" className="text-blue-600 hover:text-blue-800 font-medium">
+          <Link href="/dashboard/btp/chantiers" className="text-orange-700 hover:text-orange-900 font-medium">
             Voir tous
           </Link>
         </div>
@@ -156,7 +156,7 @@ export default function BTPDashboard() {
                     {chantier.code_chantier}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <Link href={`/dashboard/btp/chantiers/${chantier.id}`} className="text-indigo-600 hover:text-indigo-900">
+                    <Link href={`/dashboard/btp/chantiers/${chantier.id}`} className="text-orange-700 hover:text-orange-900">
                       {chantier.nom}
                     </Link>
                   </td>
@@ -172,7 +172,7 @@ export default function BTPDashboard() {
                     {chantier.budget?.toLocaleString()} €
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    <Link href={`/dashboard/btp/chantiers/${chantier.id}`} className="text-indigo-600 hover:text-indigo-900 p-2 -m-2 rounded-lg hover:bg-indigo-50">
+                    <Link href={`/dashboard/btp/chantiers/${chantier.id}`} className="text-orange-700 hover:text-orange-900 p-2 -m-2 rounded-lg hover:bg-orange-50">
                       <Eye className="w-4 h-4" />
                     </Link>
                     <Link href={`/dashboard/btp/chantiers/${chantier.id}/edit`} className="text-green-600 hover:text-green-900 p-2 -m-2 rounded-lg hover:bg-green-50">
@@ -206,4 +206,5 @@ export default function BTPDashboard() {
     </div>
   );
 }
+
 

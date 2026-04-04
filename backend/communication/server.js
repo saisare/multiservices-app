@@ -1,10 +1,10 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const { verifyToken } = require('./middleware/auth');
 
-console.log('verifyToken =', verifyToken ? '✅ chargé' : '❌ undefined');
+console.log('verifyToken =', verifyToken ? 'âœ… chargÃ©' : 'âŒ undefined');
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -17,16 +17,17 @@ const db = mysql.createConnection({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'communication_db'
+    password: process.env.DB_PASSWORD || undefined,
+    database: process.env.DB_NAME || 'auth_db',
+    charset: 'utf8mb4'
 });
 
 db.connect(err => {
     if (err) {
-        console.error('❌ Erreur connexion MySQL Communication:', err);
+        console.error('âŒ Erreur connexion MySQL Communication:', err);
         return;
     }
-    console.log(`✅ Connecté à MySQL ${process.env.DB_NAME}`);
+    console.log(`âœ… ConnectÃ© Ã  MySQL ${process.env.DB_NAME}`);
 });
 
 // Health check
@@ -51,7 +52,7 @@ app.get('/api/annonceurs', verifyToken, (req, res) => {
 app.get('/api/annonceurs/:id', verifyToken, (req, res) => {
     db.query('SELECT * FROM annonceurs WHERE id = ?', [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(404).json({ error: 'Annonceur non trouvé' });
+        if (results.length === 0) return res.status(404).json({ error: 'Annonceur non trouvÃ©' });
         res.json(results[0]);
     });
 });
@@ -71,7 +72,7 @@ app.post('/api/annonceurs', verifyToken, (req, res) => {
             res.status(201).json({
                 id: result.insertId,
                 code,
-                message: 'Annonceur créé avec succès'
+                message: 'Annonceur crÃ©Ã© avec succÃ¨s'
             });
         }
     );
@@ -104,7 +105,7 @@ app.get('/api/campagnes/:id', verifyToken, (req, res) => {
     
     db.query(sql, [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(404).json({ error: 'Campagne non trouvée' });
+        if (results.length === 0) return res.status(404).json({ error: 'Campagne non trouvÃ©e' });
         res.json(results[0]);
     });
 });
@@ -124,7 +125,7 @@ app.post('/api/campagnes', verifyToken, (req, res) => {
             res.status(201).json({
                 id: result.insertId,
                 code,
-                message: 'Campagne créée avec succès'
+                message: 'Campagne crÃ©Ã©e avec succÃ¨s'
             });
         }
     );
@@ -155,7 +156,7 @@ app.post('/api/performances', verifyToken, (req, res) => {
             if (err) return res.status(500).json({ error: err.message });
             res.status(201).json({
                 id: result.insertId,
-                message: 'Performance enregistrée'
+                message: 'Performance enregistrÃ©e'
             });
         }
     );
@@ -190,11 +191,11 @@ app.get('/api/stats', verifyToken, (req, res) => {
 });
 
 // ===========================================
-// DÉMARRAGE
+// DÃ‰MARRAGE
 // ===========================================
-app.listen(PORT, () => {
-    console.log(`\n🚀 SERVICE COMMUNICATION DÉMARRÉ`);
-    console.log(`📡 URL: http://localhost:${PORT}`);
-    console.log(`🔍 Health: http://localhost:${PORT}/health`);
-    console.log(`✅ Prêt à recevoir des requêtes\n`);
+app.listen(PORT, process.env.HOST || '0.0.0.0', () => {
+    console.log(`\nðŸš€ SERVICE COMMUNICATION DÃ‰MARRÃ‰`);
+    console.log(`ðŸ“¡ URL: http://localhost:${PORT}`);
+    console.log(`ðŸ” Health: http://localhost:${PORT}/health`);
+    console.log(`âœ… PrÃªt Ã  recevoir des requÃªtes\n`);
 });
