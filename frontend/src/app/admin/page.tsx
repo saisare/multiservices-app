@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { buildServiceBase } from '@/lib/runtime-api';
 import {
-  LogOut, Users, CheckCircle, BarChart3, Shield, AlertCircle, Clock, Trash2
+  LogOut, Users, CheckCircle, BarChart3, Shield, AlertCircle, Clock, Trash2, Key, Loader2
 } from 'lucide-react';
 
 const AUTH_API_BASE = buildServiceBase(3002);
@@ -27,6 +27,11 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ total: 0, actifs: 0, attente: 0 });
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+  const [resetPasswordId, setResetPasswordId] = useState<number | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resettingUserId, setResettingUserId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -118,6 +123,40 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleResetPassword = async (userId: number) => {
+    if (!newPassword || newPassword.length < 8) {
+      setError('Le mot de passe doit avoir au moins 8 caractères');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    try {
+      setResettingUserId(userId);
+      setError(null);
+      const response = await fetch(`${AUTH_API_BASE}/api/auth/users/${userId}/reset-password`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ newPassword })
+      });
+
+      if (response.ok) {
+        setSuccess('Mot de passe réinitialisé avec succès');
+        setResetPasswordId(null);
+        setNewPassword('');
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError('Erreur lors de la réinitialisation du mot de passe');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la réinitialisation');
+    } finally {
+      setResettingUserId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
@@ -142,6 +181,27 @@ export default function AdminDashboard() {
 
       {/* Contenu */}
       <div className="max-w-7xl mx-auto p-4">
+        {/* Alerts */}
+        {error && (
+          <div className="mb-4 flex items-start gap-3 p-4 bg-red-900/30 border border-red-600 rounded-lg">
+            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-300">Erreur</p>
+              <p className="text-red-200 text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 flex items-start gap-3 p-4 bg-green-900/30 border border-green-600 rounded-lg">
+            <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-green-300">Succès</p>
+              <p className="text-green-200 text-sm">{success}</p>
+            </div>
+          </div>
+        )}
+
         {/* Navigation  */}
         <div className="flex gap-4 mb-6 border-b border-gray-700">
           <button
@@ -216,7 +276,8 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {users.map(user => (
-                    <tr key={user.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                    <>
+                      <tr key={user.id} className="border-b border-gray-700 hover:bg-gray-700/50">
                       <td className="px-6 py-4 text-sm">{user.email}</td>
                       <td className="px-6 py-4 text-sm">{user.prenom} {user.nom}</td>
                       <td className="px-6 py-4 text-sm">
@@ -239,6 +300,15 @@ export default function AdminDashboard() {
                             Approuver
                           </button>
                         )}
+                        {user.actif === 1 && (
+                          <button
+                            onClick={() => setResetPasswordId(resetPasswordId === user.id ? null : user.id)}
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs transition flex items-center gap-1"
+                          >
+                            <Key size={14} />
+                            MDP
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDelete(user.id)}
                           className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs transition"
@@ -247,6 +317,51 @@ export default function AdminDashboard() {
                         </button>
                       </td>
                     </tr>
+                    {resetPasswordId === user.id && (
+                      <tr className="border-b border-gray-700 bg-gray-800">
+                        <td colSpan={6} className="px-6 py-4">
+                          <div className="space-y-3">
+                            <p className="text-sm text-gray-300">Définir un nouveau mot de passe pour <strong>{user.email}</strong></p>
+                            <div className="flex gap-2">
+                              <input
+                                type="password"
+                                placeholder="Minimum 8 caractères"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm placeholder-gray-400"
+                              />
+                              <button
+                                onClick={() => handleResetPassword(user.id)}
+                                disabled={resettingUserId === user.id}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 rounded text-sm transition flex items-center gap-2"
+                              >
+                                {resettingUserId === user.id ? (
+                                  <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Réinitialisation...
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle size={16} />
+                                    Réinitialiser
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setResetPasswordId(null);
+                                  setNewPassword('');
+                                }}
+                                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm transition"
+                              >
+                                Annuler
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </>
                   ))}
                 </tbody>
               </table>

@@ -443,6 +443,49 @@ app.patch('/api/auth/users/:id/reject', verifyToken, (req, res) => {
 });
 
 /**
+ * PATCH /api/auth/users/:id/reset-password
+ * Admin réinitialise le password d'un utilisateur
+ */
+app.patch('/api/auth/users/:id/reset-password', verifyToken, async (req, res) => {
+  if (!['admin', 'secretaire'].includes(req.user.role)) {
+    return res.status(403).json({ error: 'Accès refusé' });
+  }
+
+  const userId = parseInt(req.params.id);
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 8) {
+    return res.status(400).json({ error: 'Password doit avoir au moins 8 caractères' });
+  }
+
+  try {
+    // Hash le nouveau password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Mettre à jour le password
+    db.query(
+      'UPDATE users SET password_hash = ? WHERE id = ?',
+      [hashedPassword, userId],
+      (err) => {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+
+        console.log(`✅ Password reset for user ID ${userId}`);
+
+        res.json({
+          success: true,
+          message: 'Password réinitialisé avec succès',
+          newPassword: newPassword
+        });
+      }
+    );
+  } catch (err) {
+    return res.status(500).json({ error: 'Erreur lors du hachage' });
+  }
+});
+
+/**
  * GET /api/auth/users
  * Liste tous les utilisateurs (admin only)
  */
