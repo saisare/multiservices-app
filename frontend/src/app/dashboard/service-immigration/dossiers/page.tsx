@@ -126,7 +126,7 @@ export default function DossiersPage() {
     }
   };
 
-  const filteredDossiers = dossiers.filter(d => {
+  const filteredDossiers = (Array.isArray(dossiers) ? dossiers : []).filter(d => {
     const matchesSearch = (d.numero_dossier?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
                           (d.candidat_nom?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     const matchesStatus = statusFilter === 'all' || d.statut === statusFilter;

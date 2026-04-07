@@ -218,10 +218,10 @@ export default function OffresPage() {
     }
   };
 
-  const filteredVols = vols.filter(v => v.code_vol.includes(searchTerm) || v.compagnie.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredHotels = hotels.filter(h => h.nom.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredReservations = reservations.filter(r => r.code_reservation.includes(searchTerm) || r.client_nom.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredDossiers = dossiers.filter(d => d.numero_dossier.includes(searchTerm) || d.client_nom.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredVols = (Array.isArray(vols) ? vols : []).filter(v => v.code_vol.includes(searchTerm) || v.compagnie.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredHotels = (Array.isArray(hotels) ? hotels : []).filter(h => h.nom.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredReservations = (Array.isArray(reservations) ? reservations : []).filter(r => r.code_reservation.includes(searchTerm) || r.client_nom.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredDossiers = (Array.isArray(dossiers) ? dossiers : []).filter(d => d.numero_dossier.includes(searchTerm) || d.client_nom.toLowerCase().includes(searchTerm.toLowerCase()));
 
   if (loading && mode !== 'list') return <div className="flex justify-center h-64"><div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
 

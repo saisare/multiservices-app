@@ -91,7 +91,7 @@ export default function ChantiersPage() {
     .filter(c => statusFilter === 'all' || c.statut === statusFilter)
     .sort((a, b) => {
       if (sortBy === 'nom') return a.nom.localeCompare(b.nom);
-      if (sortBy === 'budget') return b.budget - a.budget;
+      if (sortBy === 'budget') return (b.budget || 0) - (a.budget || 0);
       return new Date(b.date_debut).getTime() - new Date(a.date_debut).getTime();
     });
 

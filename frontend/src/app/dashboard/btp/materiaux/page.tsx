@@ -82,14 +82,14 @@ export default function MateriauxPage() {
       setSuccess('');
 
       await btpApi.createMateriau({
-        code_materiau: form.code_materiau.trim() || undefined,
+        code_materiau: form.code_materiau.trim() || '',
         nom: form.nom.trim(),
-        categorie: form.categorie.trim() || undefined,
-        fournisseur: form.fournisseur.trim() || undefined,
+        categorie: form.categorie.trim() || '',
+        fournisseur: form.fournisseur.trim() || '',
         quantite: Number(form.quantite) || 0,
         unite: form.unite.trim() || 'unite',
         seuil_alerte: Number(form.seuil_alerte) || 0,
-        localisation: form.localisation.trim() || undefined,
+        localisation: form.localisation.trim() || '',
         prix_unitaire: Number(form.prix_unitaire) || 0,
       });
 

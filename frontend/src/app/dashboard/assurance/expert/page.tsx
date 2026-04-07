@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import {
-  Users, Search, Filter, Plus, Eye, Edit, Trash2,
-  ArrowLeft, Save, X, AlertCircle, CheckCircle,
-  Mail, Phone, MapPin, Briefcase, Star, Award
-} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Users, Search, Plus, Eye, Trash2, Mail, Phone, Briefcase } from 'lucide-react';
+import { BackButton } from '@/components/BackButton';
+import { AlertContainer } from '@/components/Alert';
+import { usePageState } from '@/hooks/usePageState';
 
 interface Expert {
   id: number;
@@ -17,126 +15,282 @@ interface Expert {
   specialite: string;
   email: string;
   telephone: string;
-  adresse: string;
-  actif: boolean;
-  date_creation: string;
+  agrement: string;
+  date_agrement: string;
 }
 
 export default function ExpertsPage() {
-  const searchParams = useSearchParams();
-  const action = searchParams.get('action');
-  const expertId = searchParams.get('id');
+  const router = useRouter();
+  const { action, itemId, isList, isDetail, isNew } = usePageState();
 
   const [experts, setExperts] = useState<Expert[]>([]);
-  const [expert, setExpert] = useState<Expert | null>(null);
-  const [mode, setMode] = useState<'list' | 'detail' | 'new' | 'edit'>('list');
-  const [loading, setLoading] = useState(true);
+  const [selectedExpert, setSelectedExpert] = useState<Expert | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
   const [formData, setFormData] = useState({
-    code_expert: '',
     nom: '',
     prenom: '',
-    specialite: '',
+    specialite: 'AUTO',
     email: '',
     telephone: '',
-    adresse: '',
-    actif: true
+    agrement: '',
+    date_agrement: new Date().toISOString().split('T')[0]
   });
 
   useEffect(() => {
-    if (action === 'new') setMode('new');
-    else if (expertId) { setMode('detail'); loadExpert(parseInt(expertId)); }
-    else loadExperts();
-  }, [action, expertId]);
+    loadExperts();
+  }, []);
+
+  useEffect(() => {
+    if (isDetail && itemId) {
+      loadExpertById(parseInt(itemId));
+    }
+  }, [itemId, isDetail]);
 
   const loadExperts = async () => {
-    setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setLoading(true);
       setExperts([
-        { id: 1, code_expert: 'EXP-001', nom: 'Dubois', prenom: 'Pierre', specialite: 'Expert automobile', email: 'pierre.dubois@expert.fr', telephone: '0123456789', adresse: 'Paris', actif: true, date_creation: '2026-01-10' },
-        { id: 2, code_expert: 'EXP-002', nom: 'Martin', prenom: 'Sophie', specialite: 'Expert habitation', email: 'sophie.martin@expert.fr', telephone: '0234567890', adresse: 'Lyon', actif: true, date_creation: '2026-01-15' },
-        { id: 3, code_expert: 'EXP-003', nom: 'Bernard', prenom: 'Jean', specialite: 'Expert santé', email: 'jean.bernard@expert.fr', telephone: '0345678901', adresse: 'Marseille', actif: true, date_creation: '2026-02-01' },
+        { id: 1, code_expert: 'EXP-001', nom: 'Kouamé', prenom: 'Marc', specialite: 'AUTO', email: 'marc.kouame@experts.ci', telephone: '0512345678', agrement: 'AGR-2024-001', date_agrement: '2024-01-15' },
+        { id: 2, code_expert: 'EXP-002', nom: 'Yao', prenom: 'Marie', specialite: 'HABITATION', email: 'marie.yao@experts.ci', telephone: '0612345679', agrement: 'AGR-2024-002', date_agrement: '2024-02-20' },
       ]);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+    } catch (err: any) {
+      setError(`Erreur: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const loadExpert = async (id: number) => {
-    setLoading(true);
+  const loadExpertById = async (id: number) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const mockExpert: Expert = { id, code_expert: 'EXP-001', nom: 'Dubois', prenom: 'Pierre', specialite: 'Expert automobile', email: 'pierre.dubois@expert.fr', telephone: '0123456789', adresse: 'Paris', actif: true, date_creation: '2026-01-10' };
-      setExpert(mockExpert);
+      setLoading(true);
+      const expert = experts.find(e => e.id === id);
+      if (!expert) {
+        setError('Expert non trouvé');
+        return;
+      }
+      setSelectedExpert(expert);
       setFormData({
-        code_expert: mockExpert.code_expert,
-        nom: mockExpert.nom,
-        prenom: mockExpert.prenom,
-        specialite: mockExpert.specialite,
-        email: mockExpert.email,
-        telephone: mockExpert.telephone,
-        adresse: mockExpert.adresse,
-        actif: mockExpert.actif
+        nom: expert.nom,
+        prenom: expert.prenom,
+        specialite: expert.specialite,
+        email: expert.email,
+        telephone: expert.telephone,
+        agrement: expert.agrement,
+        date_agrement: expert.date_agrement
       });
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+    } catch (err: any) {
+      setError(`Erreur: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCreate = async () => {
-    if (!formData.nom || !formData.prenom) { setError('Nom et prénom requis'); return; }
-    setLoading(true);
+    if (!formData.nom || !formData.prenom) {
+      setError('Nom et prénom obligatoires');
+      return;
+    }
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setLoading(true);
+      await new Promise(r => setTimeout(r, 500));
       setSuccess('Expert créé');
-      setTimeout(() => { setMode('list'); loadExperts(); }, 1500);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+      setTimeout(() => router.push('/dashboard/assurance/expert'), 1500);
+    } catch (err: any) {
+      setError(`Erreur: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleUpdate = async () => {
-    setLoading(true);
+  const handleDelete = async (id: number) => {
+    if (!confirm('Êtes-vous sûr?')) return;
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setSuccess('Expert mis à jour');
-      setTimeout(() => { setMode('detail'); if (expert) loadExpert(expert.id); }, 1500);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+      setLoading(true);
+      await new Promise(r => setTimeout(r, 500));
+      setSuccess('Expert supprimé');
+      setTimeout(() => router.push('/dashboard/assurance/expert'), 1500);
+    } catch (err: any) {
+      setError(`Erreur: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredExperts = experts.filter(e =>
     e.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    e.specialite.toLowerCase().includes(searchTerm.toLowerCase())
+    e.code_expert.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (
-    <div className="space-y-6">
-      {error && <div className="bg-red-50 p-4 rounded-lg"><AlertCircle className="w-5 h-5 inline mr-2" />{error}</div>}
-      {success && <div className="bg-green-50 p-4 rounded-lg"><CheckCircle className="w-5 h-5 inline mr-2 text-green-600" />{success}</div>}
+  if (loading && !isList) {
+    return <div className="flex justify-center h-64"><div className="animate-spin border-4 border-blue-500 border-t-transparent rounded-full w-12 h-12" /></div>;
+  }
 
-      {mode === 'list' && (
-        <>
-          <div className="flex justify-between"><div><h1 className="text-3xl font-bold">Experts</h1><p className="text-gray-600">Gestion des experts évaluateurs</p></div><Link href="/dashboard/assurance/experts?action=new" className="px-4 py-2 bg-blue-600 text-white rounded-lg"><Plus className="w-4 h-4 mr-2" />Nouvel expert</Link></div>
+  if (isList) {
+    return (
+      <div className="space-y-6">
+        <AlertContainer error={error} success={success} onErrorClose={() => setError('')} onSuccessClose={() => setSuccess('')} />
 
-          <div className="bg-white rounded-xl border p-4"><div className="relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" /><input type="text" placeholder="Rechercher un expert..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg" /></div></div>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Experts Sinistre</h1>
+            <p className="text-gray-600">Gestion des experts assermentés</p>
+          </div>
+          <button onClick={() => router.push('/dashboard/assurance/expert?action=new')} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg">
+            <Plus size={20} />
+            Nouvel expert
+          </button>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredExperts.map(e => (<div key={e.id} className="bg-white rounded-xl border p-6 hover:shadow-lg"><div className="flex justify-between"><div className="flex items-center gap-3"><div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">{e.prenom[0]}{e.nom[0]}</div><div><h3 className="font-semibold">{e.prenom} {e.nom}</h3><p className="text-sm text-gray-600">{e.specialite}</p></div></div><Link href={`/dashboard/assurance/experts?id=${e.id}`}><Eye className="w-4 h-4 text-blue-600" /></Link></div><div className="mt-4 space-y-2 text-sm"><div className="flex items-center"><Mail className="w-4 h-4 mr-2 text-gray-400" />{e.email}</div><div className="flex items-center"><Phone className="w-4 h-4 mr-2 text-gray-400" />{e.telephone}</div><div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-gray-400" />{e.adresse}</div></div><div className="mt-4 pt-4 border-t"><span className={`px-2 py-1 rounded-full text-xs ${e.actif ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{e.actif ? 'Actif' : 'Inactif'}</span></div></div>))}</div>
-        </>
-      )}
+        <div className="bg-white rounded-lg border p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input type="text" placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg" />
+          </div>
+        </div>
 
-      {(mode === 'detail' || mode === 'edit') && expert && (
-        <>
-          <div className="flex justify-between"><div className="flex items-center gap-4"><button onClick={() => setMode('list')} className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft /></button><div><h1 className="text-3xl font-bold">{expert.prenom} {expert.nom}</h1><p className="text-gray-600">{expert.code_expert}</p></div></div><div className="flex gap-2">{mode === 'detail' ? (<><button onClick={() => setMode('edit')} className="px-4 py-2 border rounded-lg"><Edit className="w-4 h-4 inline mr-2" />Modifier</button></>) : (<><button onClick={() => setMode('detail')}>Annuler</button><button onClick={handleUpdate}>Enregistrer</button></>)}</div></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredExperts.map(e => (
+            <div key={e.id} className="bg-white rounded-lg border p-6 hover:shadow-lg transition">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold">
+                    {e.prenom[0]}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{e.prenom} {e.nom}</h3>
+                    <p className="text-xs text-gray-500">{e.code_expert}</p>
+                  </div>
+                </div>
+                <button onClick={() => router.push(`/dashboard/assurance/expert?action=detail&id=${e.id}`)} className="p-1 hover:bg-gray-100 rounded"><Eye size={18} className="text-blue-600" /></button>
+              </div>
+              <div className="space-y-1 text-sm text-gray-600">
+                <div className="flex items-center gap-2"><Briefcase size={14} />{e.specialite}</div>
+                <div className="flex items-center gap-2"><Mail size={14} />{e.email}</div>
+                <div className="flex items-center gap-2"><Phone size={14} />{e.telephone}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
-          <div className="bg-white rounded-xl border p-6">{mode === 'detail' ? (<div className="grid grid-cols-2 gap-4"><div><p className="text-sm text-gray-600">Spécialité</p><p className="font-medium">{expert.specialite}</p></div><div><p className="text-sm text-gray-600">Email</p><p>{expert.email}</p></div><div><p className="text-sm text-gray-600">Téléphone</p><p>{expert.telephone}</p></div><div><p className="text-sm text-gray-600">Adresse</p><p>{expert.adresse}</p></div></div>) : (<div><input type="text" placeholder="Nom" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} className="w-full mb-3 p-2 border rounded" /><input type="text" placeholder="Prénom" value={formData.prenom} onChange={e => setFormData({...formData, prenom: e.target.value})} className="w-full mb-3 p-2 border rounded" /><input type="text" placeholder="Spécialité" value={formData.specialite} onChange={e => setFormData({...formData, specialite: e.target.value})} className="w-full mb-3 p-2 border rounded" /><input type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full mb-3 p-2 border rounded" /><input type="tel" placeholder="Téléphone" value={formData.telephone} onChange={e => setFormData({...formData, telephone: e.target.value})} className="w-full mb-3 p-2 border rounded" /><textarea placeholder="Adresse" value={formData.adresse} onChange={e => setFormData({...formData, adresse: e.target.value})} rows={3} className="w-full p-2 border rounded" /><label className="flex items-center mt-3"><input type="checkbox" checked={formData.actif} onChange={e => setFormData({...formData, actif: e.target.checked})} className="mr-2" />Actif</label></div>)}</div>
-        </>
-      )}
+  if (isNew) {
+    return (
+      <div className="space-y-6">
+        <AlertContainer error={error} success={success} onErrorClose={() => setError('')} onSuccessClose={() => setSuccess('')} />
 
-      {mode === 'new' && (
-        <>
-          <div className="flex items-center gap-4"><button onClick={() => setMode('list')} className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft /></button><h1 className="text-3xl font-bold">Nouvel expert</h1></div>
-          <div className="bg-white rounded-xl border p-6"><div className="grid grid-cols-2 gap-4"><input type="text" placeholder="Nom *" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} className="p-2 border rounded" /><input type="text" placeholder="Prénom *" value={formData.prenom} onChange={e => setFormData({...formData, prenom: e.target.value})} className="p-2 border rounded" /><input type="text" placeholder="Spécialité" value={formData.specialite} onChange={e => setFormData({...formData, specialite: e.target.value})} className="p-2 border rounded" /><input type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="p-2 border rounded" /><input type="tel" placeholder="Téléphone" value={formData.telephone} onChange={e => setFormData({...formData, telephone: e.target.value})} className="p-2 border rounded" /><textarea placeholder="Adresse" value={formData.adresse} onChange={e => setFormData({...formData, adresse: e.target.value})} rows={3} className="col-span-2 p-2 border rounded" /></div><div className="flex justify-end gap-3 mt-6 pt-6 border-t"><button onClick={() => setMode('list')} className="px-4 py-2 border rounded">Annuler</button><button onClick={handleCreate} disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Créer</button></div></div>
-        </>
-      )}
-    </div>
-  );
+        <div className="flex items-center gap-4">
+          <BackButton href="/dashboard/assurance/expert" />
+          <h1 className="text-3xl font-bold">Nouvel expert</h1>
+        </div>
+
+        <div className="bg-white rounded-lg border p-8 max-w-2xl">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Prénom *</label>
+                <input type="text" value={formData.prenom} onChange={e => setFormData({...formData, prenom: e.target.value})} className="w-full p-2 border rounded-lg" placeholder="Prénom" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Nom *</label>
+                <input type="text" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} className="w-full p-2 border rounded-lg" placeholder="Nom" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Spécialité</label>
+              <select value={formData.specialite} onChange={e => setFormData({...formData, specialite: e.target.value})} className="w-full p-2 border rounded-lg">
+                <option value="AUTO">Automobile</option>
+                <option value="HABITATION">Habitation</option>
+                <option value="SANTE">Santé</option>
+                <option value="GENERAL">Généraliste</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Email</label>
+              <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full p-2 border rounded-lg" placeholder="email@example.com" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Téléphone</label>
+              <input type="tel" value={formData.telephone} onChange={e => setFormData({...formData, telephone: e.target.value})} className="w-full p-2 border rounded-lg" placeholder="0123456789" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Agrément</label>
+                <input type="text" value={formData.agrement} onChange={e => setFormData({...formData, agrement: e.target.value})} className="w-full p-2 border rounded-lg" placeholder="Numéro agrément" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Date agrément</label>
+                <input type="date" value={formData.date_agrement} onChange={e => setFormData({...formData, date_agrement: e.target.value})} className="w-full p-2 border rounded-lg" />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-6 border-t">
+              <button onClick={() => router.push('/dashboard/assurance/expert')} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Annuler</button>
+              <button onClick={handleCreate} disabled={loading} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">{loading ? 'Création...' : 'Créer'}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isDetail && selectedExpert) {
+    return (
+      <div className="space-y-6">
+        <AlertContainer error={error} success={success} onErrorClose={() => setError('')} onSuccessClose={() => setSuccess('')} />
+
+        <div className="flex items-center gap-4">
+          <BackButton href="/dashboard/assurance/expert" />
+          <h1 className="text-3xl font-bold flex-1">{selectedExpert.prenom} {selectedExpert.nom}</h1>
+          <button onClick={() => handleDelete(selectedExpert.id)} className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"><Trash2 size={18} />Supprimer</button>
+        </div>
+
+        <div className="bg-white rounded-lg border p-8 max-w-2xl">
+          <h2 className="text-xl font-semibold mb-6">Informations</h2>
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600">Code</p>
+                <p className="font-medium">{selectedExpert.code_expert}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Spécialité</p>
+                <p className="font-medium">{selectedExpert.specialite}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Email</p>
+                <p className="font-medium">{selectedExpert.email}</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600">Téléphone</p>
+                <p className="font-medium">{selectedExpert.telephone}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Agrément</p>
+                <p className="font-medium">{selectedExpert.agrement}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Date d'agrément</p>
+                <p className="font-medium">{new Date(selectedExpert.date_agrement).toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }

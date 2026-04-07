@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Users, Search, Filter, Plus, Eye, Edit, Trash2,
-  ArrowLeft, Save, X, AlertCircle, CheckCircle,
-  Mail, Phone, MapPin, Calendar, FileText, Shield,
-  Building2, User, Briefcase, Home
+  ArrowLeft, AlertCircle, CheckCircle, Mail, Phone, MapPin
 } from 'lucide-react';
+import { BackButton } from '@/components/BackButton';
+import { AlertContainer } from '@/components/Alert';
+import { usePageState } from '@/hooks/usePageState';
 
 interface Assure {
   id: number;
@@ -16,165 +16,405 @@ interface Assure {
   type_assure: 'PARTICULIER' | 'ENTREPRISE';
   nom: string;
   prenom: string;
-  entreprise: string;
-  date_naissance: string;
   email: string;
   telephone: string;
   adresse: string;
   date_creation: string;
 }
 
-interface Police {
-  id: number;
-  numero_police: string;
-  type_assurance: string;
-  date_effet: string;
-  date_echeance: string;
-  prime_annuelle: number;
-  statut: string;
-}
-
-export default function AssuresPage() {
-  const searchParams = useSearchParams();
-  const action = searchParams.get('action');
-  const assureId = searchParams.get('id');
+export default function AssuresPageV2() {
+  const router = useRouter();
+  const { action, itemId, isList, isDetail, isNew } = usePageState();
 
   const [assures, setAssures] = useState<Assure[]>([]);
-  const [assure, setAssure] = useState<Assure | null>(null);
-  const [polices, setPolices] = useState<Police[]>([]);
-  const [mode, setMode] = useState<'list' | 'detail' | 'new' | 'edit'>('list');
-  const [loading, setLoading] = useState(true);
+  const [selectedAssure, setSelectedAssure] = useState<Assure | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
 
-  const [formData, setFormData] = useState({
-    code_assure: '',
+  const [formData, setFormData] = useState<{
+    type_assure: 'PARTICULIER' | 'ENTREPRISE';
+    nom: string;
+    prenom: string;
+    email: string;
+    telephone: string;
+    adresse: string;
+  }>({
     type_assure: 'PARTICULIER',
     nom: '',
     prenom: '',
-    entreprise: '',
-    date_naissance: '',
     email: '',
     telephone: '',
     adresse: ''
   });
 
+  // Charger les assurés
   useEffect(() => {
-    if (action === 'new') setMode('new');
-    else if (assureId) { setMode('detail'); loadAssure(parseInt(assureId)); }
-    else loadAssures();
-  }, [action, assureId]);
+    loadAssures();
+  }, []);
+
+  // Charger un assuré spécifique quand l'ID change
+  useEffect(() => {
+    if (isDetail && itemId) {
+      loadAssureById(parseInt(itemId));
+    }
+  }, [itemId, isDetail]);
 
   const loadAssures = async () => {
-    setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setLoading(true);
+      // Mock data pour test
       setAssures([
-        { id: 1, code_assure: 'ASS-001', type_assure: 'PARTICULIER', nom: 'Konan', prenom: 'Jean', entreprise: '', date_naissance: '1985-05-15', email: 'jean.konan@email.com', telephone: '0123456789', adresse: 'Cocody, Abidjan', date_creation: '2026-01-10' },
-        { id: 2, code_assure: 'ASS-002', type_assure: 'PARTICULIER', nom: 'Diallo', prenom: 'Aminata', entreprise: '', date_naissance: '1990-08-22', email: 'aminata.diallo@email.com', telephone: '0234567890', adresse: 'Plateau, Abidjan', date_creation: '2026-01-15' },
-        { id: 3, code_assure: 'ASS-003', type_assure: 'ENTREPRISE', nom: 'Tech Solutions', prenom: '', entreprise: 'Tech Solutions SARL', date_naissance: '', email: 'contact@techsolutions.ci', telephone: '0345678901', adresse: 'Marcory, Abidjan', date_creation: '2026-02-01' },
+        { id: 1, code_assure: 'ASS-001', type_assure: 'PARTICULIER', nom: 'Konan', prenom: 'Jean', email: 'jean.konan@email.com', telephone: '0123456789', adresse: 'Cocody, Abidjan', date_creation: '2026-01-10' },
+        { id: 2, code_assure: 'ASS-002', type_assure: 'PARTICULIER', nom: 'Diallo', prenom: 'Aminata', email: 'aminata.diallo@email.com', telephone: '0234567890', adresse: 'Plateau, Abidjan', date_creation: '2026-01-15' },
+        { id: 3, code_assure: 'ASS-003', type_assure: 'ENTREPRISE', nom: 'Tech Solutions', prenom: '', email: 'contact@techsolutions.ci', telephone: '0345678901', adresse: 'Marcory, Abidjan', date_creation: '2026-02-01' },
       ]);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+    } catch (err: any) {
+      setError(`Erreur chargement: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const loadAssure = async (id: number) => {
-    setLoading(true);
+  const loadAssureById = async (id: number) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const mockAssure: Assure = { id, code_assure: 'ASS-001', type_assure: 'PARTICULIER', nom: 'Konan', prenom: 'Jean', entreprise: '', date_naissance: '1985-05-15', email: 'jean.konan@email.com', telephone: '0123456789', adresse: 'Cocody, Abidjan', date_creation: '2026-01-10' };
-      setAssure(mockAssure);
+      setLoading(true);
+      const assure = assures.find(a => a.id === id);
+      if (!assure) {
+        setError('Assuré non trouvé');
+        return;
+      }
+      setSelectedAssure(assure);
       setFormData({
-        code_assure: mockAssure.code_assure,
-        type_assure: mockAssure.type_assure,
-        nom: mockAssure.nom,
-        prenom: mockAssure.prenom,
-        entreprise: mockAssure.entreprise,
-        date_naissance: mockAssure.date_naissance,
-        email: mockAssure.email,
-        telephone: mockAssure.telephone,
-        adresse: mockAssure.adresse
+        type_assure: assure.type_assure,
+        nom: assure.nom,
+        prenom: assure.prenom,
+        email: assure.email,
+        telephone: assure.telephone,
+        adresse: assure.adresse
       });
-      setPolices([
-        { id: 1, numero_police: 'POL-2024-001', type_assurance: 'AUTO', date_effet: '2024-01-01', date_echeance: '2024-12-31', prime_annuelle: 500, statut: 'ACTIVE' },
-        { id: 2, numero_police: 'POL-2024-002', type_assurance: 'HABITATION', date_effet: '2024-02-01', date_echeance: '2025-01-31', prime_annuelle: 300, statut: 'ACTIVE' },
-      ]);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+    } catch (err: any) {
+      setError(`Erreur: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCreate = async () => {
-    if (!formData.nom || (formData.type_assure === 'PARTICULIER' && !formData.prenom)) {
-      setError('Nom requis');
+    if (!formData.nom) {
+      setError('Le nom est obligatoire');
       return;
     }
-    setLoading(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setSuccess('Assuré créé avec succès');
-      setTimeout(() => { setMode('list'); loadAssures(); }, 1500);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
-  };
 
-  const handleUpdate = async () => {
-    setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setSuccess('Assuré mis à jour');
-      setTimeout(() => { setMode('detail'); if (assure) loadAssure(assure.id); }, 1500);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+      setLoading(true);
+      // Simuler création
+      await new Promise(r => setTimeout(r, 500));
+      setSuccess('Assuré créé avec succès');
+      setTimeout(() => router.push('/dashboard/assurance/assures'), 1500);
+    } catch (err: any) {
+      setError(`Erreur création: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Supprimer cet assuré ?')) return;
+    if (!confirm('Êtes-vous sûr?')) return;
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      setLoading(true);
+      await new Promise(r => setTimeout(r, 500));
       setSuccess('Assuré supprimé');
-      setTimeout(() => { setMode('list'); loadAssures(); }, 1500);
-    } catch (err: any) { setError(err.message); }
+      setTimeout(() => router.push('/dashboard/assurance/assures'), 1500);
+    } catch (err: any) {
+      setError(`Erreur suppression: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredAssures = assures.filter(a =>
-    a.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (a.prenom && a.prenom.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    a.code_assure.toLowerCase().includes(searchTerm.toLowerCase())
-  ).filter(a => typeFilter === 'all' || a.type_assure === typeFilter);
+    (a.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.code_assure.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (typeFilter === 'all' || a.type_assure === typeFilter)
+  );
 
-  if (loading && mode !== 'list') return <div className="flex justify-center h-64"><div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full" /></div>;
+  if (loading && !isList) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin border-4 border-blue-500 border-t-transparent rounded-full w-12 h-12" />
+      </div>
+    );
+  }
+
+  // PAGE LISTE
+  if (isList) {
+    return (
+      <div className="space-y-6">
+        <AlertContainer
+          error={error}
+          success={success}
+          onErrorClose={() => setError('')}
+          onSuccessClose={() => setSuccess('')}
+        />
+
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Assurés</h1>
+            <p className="text-gray-600">Gestion des clients d'assurance</p>
+          </div>
+          <button
+            onClick={() => router.push('/dashboard/assurance/assures?action=new')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+          >
+            <Plus size={20} />
+            Nouvel assuré
+          </button>
+        </div>
+
+        <div className="bg-white rounded-lg border p-4 flex gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border rounded-lg"
+            />
+          </div>
+          <select
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value)}
+            className="px-4 py-2 border rounded-lg"
+          >
+            <option value="all">Tous types</option>
+            <option value="PARTICULIER">Particuliers</option>
+            <option value="ENTREPRISE">Entreprises</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAssures.map(a => (
+            <div key={a.id} className="bg-white rounded-lg border p-4 hover:shadow-lg transition">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    {a.prenom ? a.prenom[0] : a.nom[0]}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">
+                      {a.type_assure === 'PARTICULIER' ? `${a.prenom} ${a.nom}` : a.nom}
+                    </h3>
+                    <p className="text-xs text-gray-500">{a.code_assure}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push(`/dashboard/assurance/assures?action=detail&id=${a.id}`)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <Eye size={18} className="text-blue-600" />
+                </button>
+              </div>
+              <div className="space-y-1 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <Mail size={14} />
+                  {a.email}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone size={14} />
+                  {a.telephone}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {filteredAssures.length === 0 && (
+          <div className="text-center py-12">
+            <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">Aucun assuré trouvé</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // PAGE NOUVEAU
+  if (isNew) {
+    return (
+      <div className="space-y-6">
+        <AlertContainer
+          error={error}
+          success={success}
+          onErrorClose={() => setError('')}
+          onSuccessClose={() => setSuccess('')}
+        />
+
+        <div className="flex items-center gap-4">
+          <BackButton href="/dashboard/assurance/assures" />
+          <h1 className="text-3xl font-bold flex-1">Nouvel assuré</h1>
+        </div>
+
+        <div className="bg-white rounded-lg border p-8 max-w-2xl">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Type</label>
+              <select
+                value={formData.type_assure}
+                onChange={e => setFormData({...formData, type_assure: e.target.value as any})}
+                className="w-full p-2 border rounded-lg"
+              >
+                <option value="PARTICULIER">Particulier</option>
+                <option value="ENTREPRISE">Entreprise</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Nom *</label>
+              <input
+                type="text"
+                value={formData.nom}
+                onChange={e => setFormData({...formData, nom: e.target.value})}
+                className="w-full p-2 border rounded-lg"
+                placeholder="Nom"
+              />
+            </div>
+
+            {formData.type_assure === 'PARTICULIER' && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Prénom</label>
+                <input
+                  type="text"
+                  value={formData.prenom}
+                  onChange={e => setFormData({...formData, prenom: e.target.value})}
+                  className="w-full p-2 border rounded-lg"
+                  placeholder="Prénom"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Email</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={e => setFormData({...formData, email: e.target.value})}
+                className="w-full p-2 border rounded-lg"
+                placeholder="email@example.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Téléphone</label>
+              <input
+                type="tel"
+                value={formData.telephone}
+                onChange={e => setFormData({...formData, telephone: e.target.value})}
+                className="w-full p-2 border rounded-lg"
+                placeholder="0123456789"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Adresse</label>
+              <textarea
+                value={formData.adresse}
+                onChange={e => setFormData({...formData, adresse: e.target.value})}
+                className="w-full p-2 border rounded-lg"
+                rows={3}
+                placeholder="Adresse complète"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-6 border-t">
+              <button
+                onClick={() => router.push('/dashboard/assurance/assures')}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Création...' : 'Créer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // PAGE DÉTAIL
+  if (isDetail && selectedAssure) {
+    return (
+      <div className="space-y-6">
+        <AlertContainer
+          error={error}
+          success={success}
+          onErrorClose={() => setError('')}
+          onSuccessClose={() => setSuccess('')}
+        />
+
+        <div className="flex items-center gap-4">
+          <BackButton href="/dashboard/assurance/assures" />
+          <h1 className="text-3xl font-bold flex-1">
+            {selectedAssure.type_assure === 'PARTICULIER'
+              ? `${selectedAssure.prenom} ${selectedAssure.nom}`
+              : selectedAssure.nom}
+          </h1>
+          <button
+            onClick={() => handleDelete(selectedAssure.id)}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+          >
+            <Trash2 size={18} />
+            Supprimer
+          </button>
+        </div>
+
+        <div className="bg-white rounded-lg border p-8 max-w-2xl">
+          <h2 className="text-xl font-semibold mb-6">Informations</h2>
+          <div className="space-y-3 text-gray-700">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Type</p>
+                <p className="font-medium">
+                  {selectedAssure.type_assure === 'PARTICULIER' ? 'Particulier' : 'Entreprise'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Code</p>
+                <p className="font-medium">{selectedAssure.code_assure}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Email</p>
+              <p className="font-medium">{selectedAssure.email}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Téléphone</p>
+              <p className="font-medium">{selectedAssure.telephone}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Adresse</p>
+              <p className="font-medium">{selectedAssure.adresse}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {error && <div className="bg-red-50 p-4 rounded-lg"><AlertCircle className="w-5 h-5 inline mr-2" />{error}</div>}
-      {success && <div className="bg-green-50 p-4 rounded-lg"><CheckCircle className="w-5 h-5 inline mr-2 text-green-600" />{success}</div>}
-
-      {mode === 'list' && (
-        <>
-          <div className="flex justify-between"><div><h1 className="text-3xl font-bold">Assurés</h1><p className="text-gray-600">Gestion des clients d'assurance</p></div><Link href="/dashboard/assurance/assures?action=new" className="px-4 py-2 bg-blue-600 text-white rounded-lg"><Plus className="w-4 h-4 mr-2" />Nouvel assuré</Link></div>
-
-          <div className="bg-white rounded-xl border p-4"><div className="flex gap-4"><div className="flex-1 relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" /><input type="text" placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg" /></div><select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-4 py-2 border rounded-lg"><option value="all">Tous</option><option value="PARTICULIER">Particuliers</option><option value="ENTREPRISE">Entreprises</option></select></div></div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{filteredAssures.map(a => (<div key={a.id} className="bg-white rounded-xl border p-6 hover:shadow-lg"><div className="flex justify-between"><div className="flex items-center gap-3"><div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">{a.type_assure === 'PARTICULIER' ? a.prenom[0] : a.nom[0]}</div><div><h3 className="font-semibold">{a.type_assure === 'PARTICULIER' ? `${a.prenom} ${a.nom}` : a.nom}</h3><p className="text-sm text-gray-600">{a.code_assure}</p></div></div><Link href={`/dashboard/assurance/assures?id=${a.id}`}><Eye className="w-4 h-4 text-blue-600" /></Link></div><div className="mt-4 space-y-2 text-sm"><div className="flex items-center"><Mail className="w-4 h-4 mr-2 text-gray-400" />{a.email}</div><div className="flex items-center"><Phone className="w-4 h-4 mr-2 text-gray-400" />{a.telephone}</div><div className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-gray-400" />{a.adresse}</div></div></div>))}</div>
-        </>
-      )}
-
-      {(mode === 'detail' || mode === 'edit') && assure && (
-        <>
-          <div className="flex justify-between"><div className="flex items-center gap-4"><button onClick={() => setMode('list')} className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft /></button><div><h1 className="text-3xl font-bold">{assure.type_assure === 'PARTICULIER' ? `${assure.prenom} ${assure.nom}` : assure.nom}</h1><p className="text-gray-600">{assure.code_assure}</p></div></div><div className="flex gap-2">{mode === 'detail' ? (<><button onClick={() => setMode('edit')} className="px-4 py-2 border rounded-lg"><Edit className="w-4 h-4 inline mr-2" />Modifier</button><button onClick={() => handleDelete(assure.id)} className="px-4 py-2 bg-red-600 text-white rounded-lg"><Trash2 className="w-4 h-4 inline mr-2" />Supprimer</button></>) : (<><button onClick={() => setMode('detail')}>Annuler</button><button onClick={handleUpdate}>Enregistrer</button></>)}</div></div>
-
-          <div className="grid grid-cols-3 gap-6"><div className="col-span-2 bg-white rounded-xl border p-6">{mode === 'detail' ? (<div className="grid grid-cols-2 gap-4"><div><p className="text-sm text-gray-600">Type</p><p className="font-medium">{assure.type_assure === 'PARTICULIER' ? 'Particulier' : 'Entreprise'}</p></div><div><p className="text-sm text-gray-600">Email</p><p>{assure.email}</p></div><div><p className="text-sm text-gray-600">Téléphone</p><p>{assure.telephone}</p></div><div><p className="text-sm text-gray-600">Adresse</p><p>{assure.adresse}</p></div>{assure.date_naissance && <div><p className="text-sm text-gray-600">Date naissance</p><p>{new Date(assure.date_naissance).toLocaleDateString()}</p></div>}</div>) : (<div><select value={formData.type_assure} onChange={e => setFormData({...formData, type_assure: e.target.value as any})} className="w-full mb-3 p-2 border rounded"><option value="PARTICULIER">Particulier</option><option value="ENTREPRISE">Entreprise</option></select><input type="text" placeholder="Nom" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} className="w-full mb-3 p-2 border rounded" /><input type="text" placeholder="Prénom" value={formData.prenom} onChange={e => setFormData({...formData, prenom: e.target.value})} className="w-full mb-3 p-2 border rounded" /><input type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full mb-3 p-2 border rounded" /><input type="tel" placeholder="Téléphone" value={formData.telephone} onChange={e => setFormData({...formData, telephone: e.target.value})} className="w-full mb-3 p-2 border rounded" /><input type="date" value={formData.date_naissance} onChange={e => setFormData({...formData, date_naissance: e.target.value})} className="w-full mb-3 p-2 border rounded" /><textarea placeholder="Adresse" value={formData.adresse} onChange={e => setFormData({...formData, adresse: e.target.value})} rows={3} className="w-full p-2 border rounded" /></div>)}</div>
-
-            <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl p-6 text-white"><h3 className="text-lg font-semibold mb-4">Statistiques</h3><div><p className="text-blue-100">Polices actives</p><p className="text-2xl font-bold">{polices.filter(p => p.statut === 'ACTIVE').length}</p></div><div className="mt-4"><p className="text-blue-100">Primes annuelles</p><p className="text-2xl font-bold">{polices.reduce((sum, p) => sum + p.prime_annuelle, 0).toLocaleString()} €</p></div></div></div>
-
-          <div className="bg-white rounded-xl border p-6"><h2 className="text-lg font-semibold mb-4">Polices d'assurance</h2><table className="w-full"><thead><tr><th className="text-left">Police</th><th>Type</th><th>Prime</th><th>Statut</th><th>Actions</th></tr></thead><tbody>{polices.map(p => (<tr key={p.id}><td>{p.numero_police}</td><td>{p.type_assurance}</td><td>{p.prime_annuelle} €</td><td><span className={`px-2 py-1 rounded-full text-xs ${p.statut === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>{p.statut}</span></td><td><Link href={`/dashboard/assurance/polices?id=${p.id}`}><Eye className="w-4 h-4 text-blue-600" /></Link></td></tr>))}</tbody></table></div>
-        </>
-      )}
-
-      {mode === 'new' && (
-        <>
-          <div className="flex items-center gap-4"><button onClick={() => setMode('list')} className="p-2 hover:bg-gray-100 rounded-lg"><ArrowLeft /></button><h1 className="text-3xl font-bold">Nouvel assuré</h1></div>
-          <div className="bg-white rounded-xl border p-6"><div className="grid grid-cols-2 gap-4"><select value={formData.type_assure} onChange={e => setFormData({...formData, type_assure: e.target.value as any})} className="p-2 border rounded"><option value="PARTICULIER">Particulier</option><option value="ENTREPRISE">Entreprise</option></select><input type="text" placeholder="Nom *" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} className="p-2 border rounded" /><input type="text" placeholder="Prénom" value={formData.prenom} onChange={e => setFormData({...formData, prenom: e.target.value})} className="p-2 border rounded" /><input type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="p-2 border rounded" /><input type="tel" placeholder="Téléphone" value={formData.telephone} onChange={e => setFormData({...formData, telephone: e.target.value})} className="p-2 border rounded" /><input type="date" value={formData.date_naissance} onChange={e => setFormData({...formData, date_naissance: e.target.value})} className="p-2 border rounded" /><textarea placeholder="Adresse" value={formData.adresse} onChange={e => setFormData({...formData, adresse: e.target.value})} rows={3} className="col-span-2 p-2 border rounded" /></div><div className="flex justify-end gap-3 mt-6 pt-6 border-t"><button onClick={() => setMode('list')} className="px-4 py-2 border rounded">Annuler</button><button onClick={handleCreate} disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Créer</button></div></div>
-        </>
-      )}
+    <div className="text-center py-12">
+      <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+      <p className="text-gray-700">État invalide de la page</p>
     </div>
   );
 }
