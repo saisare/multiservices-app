@@ -9,6 +9,7 @@ import {
   Calendar, DollarSign, Briefcase, Star,
   TrendingUp, Award, Clock, Users
 } from 'lucide-react';
+import { rhApi } from '@/services/api/rh.api';
 
 interface Contrat {
   id: number;
@@ -79,44 +80,58 @@ export default function ContratsPage() {
   const loadContrats = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setContrats([
-        { id: 1, numero_contrat: 'CTR-001', employe_id: 1, employe_nom: 'Jean Konan', type_contrat: 'CDI', date_debut: '2023-01-15', date_fin: '', salaire: 400000, statut: 'ACTIF', fichier_contrat: '' },
-        { id: 2, numero_contrat: 'CTR-002', employe_id: 2, employe_nom: 'Aminata Diallo', type_contrat: 'CDI', date_debut: '2023-03-10', date_fin: '', salaire: 350000, statut: 'ACTIF', fichier_contrat: '' },
-        { id: 3, numero_contrat: 'CTR-003', employe_id: 3, employe_nom: 'Amadou Touré', type_contrat: 'CDD', date_debut: '2024-01-01', date_fin: '2024-12-31', salaire: 550000, statut: 'ACTIF', fichier_contrat: '' },
+      const [contratsData, evaluationsData] = await Promise.all([
+        rhApi.getContrats(),
+        rhApi.getEvaluations()
       ]);
+      setContrats((contratsData as any[]).map((contrat) => ({
+        ...contrat,
+        employe_nom: [contrat.employe_prenom, contrat.employe_nom].filter(Boolean).join(' ').trim() || contrat.employe_display_name || `Employé #${contrat.employe_id}`
+      })));
+      setEvaluations((evaluationsData as any[]).map((evaluation) => ({
+        ...evaluation,
+        employe_nom: [evaluation.employe_prenom, evaluation.employe_nom].filter(Boolean).join(' ').trim() || evaluation.employe_display_name || `Employé #${evaluation.employe_id}`
+      })));
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   const loadContrat = async (id: number) => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const mock: Contrat = { id, numero_contrat: 'CTR-001', employe_id: 1, employe_nom: 'Jean Konan', type_contrat: 'CDI', date_debut: '2023-01-15', date_fin: '', salaire: 400000, statut: 'ACTIF', fichier_contrat: '' };
-      setContrat(mock);
-      setFormData({
-        employe_id: mock.employe_id.toString(),
-        type_contrat: mock.type_contrat,
-        date_debut: mock.date_debut,
-        date_fin: mock.date_fin,
-        salaire: mock.salaire.toString(),
-        fichier_contrat: mock.fichier_contrat
-      });
-      setEvaluations([
-        { id: 1, employe_id: 1, employe_nom: 'Jean Konan', date_evaluation: '2024-06-15', periode: '2024-S1', note_technique: 4, note_comportement: 5, note_global: 4.5, commentaires: 'Excellent travail' },
-        { id: 2, employe_id: 1, employe_nom: 'Jean Konan', date_evaluation: '2023-12-10', periode: '2023-ANNUEL', note_technique: 4, note_comportement: 4, note_global: 4, commentaires: 'Bon travail' },
+      const [contratsData, evaluationsData] = await Promise.all([
+        rhApi.getContrats(),
+        rhApi.getEvaluations()
       ]);
+      const current = (contratsData as any[]).find((item) => item.id === id);
+      if (!current) {
+        throw new Error('Contrat introuvable');
+      }
+      const normalized = {
+        ...current,
+        employe_nom: [current.employe_prenom, current.employe_nom].filter(Boolean).join(' ').trim() || current.employe_display_name || `Employé #${current.employe_id}`
+      };
+      setContrat(normalized);
+      setFormData({
+        employe_id: String(current.employe_id),
+        type_contrat: current.type_contrat,
+        date_debut: current.date_debut ? current.date_debut.slice(0, 10) : '',
+        date_fin: current.date_fin ? current.date_fin.slice(0, 10) : '',
+        salaire: String(current.salaire || ''),
+        fichier_contrat: current.fichier_contrat || ''
+      });
+      setEvaluations((evaluationsData as any[])
+        .filter((item) => item.employe_id === current.employe_id)
+        .map((item) => ({
+          ...item,
+          employe_nom: [item.employe_prenom, item.employe_nom].filter(Boolean).join(' ').trim() || item.employe_display_name || `Employé #${item.employe_id}`
+        })));
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   const loadEmployes = async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setEmployes([
-        { id: 1, nom: 'Konan', prenom: 'Jean' },
-        { id: 2, nom: 'Diallo', prenom: 'Aminata' },
-        { id: 3, nom: 'Touré', prenom: 'Amadou' },
-      ]);
+      const employesData = await rhApi.getEmployes();
+      setEmployes((employesData || []).map((item) => ({ id: item.id, nom: item.nom, prenom: item.prenom })));
     } catch (err: any) { console.error(err); }
   };
 
@@ -124,7 +139,15 @@ export default function ContratsPage() {
     if (!formData.employe_id || !formData.salaire) { setError('Employé et salaire requis'); return; }
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await rhApi.createContrat({
+        employe_id: Number(formData.employe_id),
+        type_contrat: formData.type_contrat,
+        date_debut: formData.date_debut,
+        date_fin: formData.date_fin || null,
+        salaire: Number(formData.salaire),
+        fichier_contrat: formData.fichier_contrat || null,
+        statut: 'ACTIF'
+      });
       setSuccess('Contrat créé');
       setTimeout(() => { setMode('list'); loadContrats(); }, 1500);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
@@ -134,10 +157,17 @@ export default function ContratsPage() {
     if (!evalForm.employe_id || !evalForm.periode) { setError('Employé et période requis'); return; }
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await rhApi.createEvaluation({
+        employe_id: Number(evalForm.employe_id),
+        date_evaluation: new Date().toISOString().slice(0, 10),
+        periode: evalForm.periode,
+        note_technique: Number(evalForm.note_technique),
+        note_comportement: Number(evalForm.note_comportement),
+        commentaires: evalForm.commentaires
+      });
       setSuccess('Évaluation enregistrée');
       setShowEvalForm(false);
-      setTimeout(() => { if (contrat) loadContrat(contrat.id); }, 1500);
+      setTimeout(() => { if (contrat) loadContrat(contrat.id); else loadContrats(); }, 1500);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 

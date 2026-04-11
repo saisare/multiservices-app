@@ -1,9 +1,9 @@
 'use client';
 
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { 
-  Menu, X, Home, Users, FileText, Calendar, BarChart3, Shield,
+  Menu, X, Home, Users, FileText, Calendar, BarChart3,
   Building2, PackageCheck, HardDrive, Hammer, Globe2
 } from "lucide-react";
 import Link from "next/link";
@@ -12,6 +12,7 @@ interface User {
   nom: string;
   prenom: string;
   departement: string;
+  photo_profil?: string | null;
 }
 
 export default function DashboardLayout({
@@ -24,11 +25,8 @@ export default function DashboardLayout({
   const params = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [department, setDepartment] = useState("btp");
 
-useEffect(() => {
+  useEffect(() => {
     const token = localStorage.getItem("token");
     const u = localStorage.getItem("user");
     if (!token || !u) {
@@ -36,22 +34,32 @@ useEffect(() => {
       return;
     }
     try {
-      const parsedUser = JSON.parse(u);
-      setUser(parsedUser);
-      const routeDepartment =
-        (params.department as string) ||
-        pathname.split("/")[2] ||
-        parsedUser?.departement ||
-        localStorage.getItem("departement") ||
-        "btp";
-      setDepartment(routeDepartment);
+      JSON.parse(u);
     } catch {
       router.push("/login");
     }
-    setLoading(false);
-  }, [params, pathname, router]); 
+  }, [router]);
 
-  if (loading) return <div>Loading...</div>;
+  const user = useMemo<User | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const department = useMemo(() => {
+    return (
+      (params.department as string) ||
+      pathname.split("/")[2] ||
+      user?.departement ||
+      (typeof window !== "undefined" ? localStorage.getItem("departement") : null) ||
+      "btp"
+    );
+  }, [params, pathname, user]);
+
+  if (!user) return <div>Loading...</div>;
 
   // Menu dynamique par département
   const getNavItems = () => {
@@ -100,8 +108,12 @@ const deptMenus = {
 
         <div className="p-6 border-b border-gray-700">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">{user?.nom.charAt(0)}{user?.prenom?.charAt(0)}</span>
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+              {user?.photo_profil ? (
+                <img src={user.photo_profil} alt="Photo de profil" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-white font-bold text-sm">{user?.nom.charAt(0)}{user?.prenom?.charAt(0)}</span>
+              )}
             </div>
             <div>
               <h1 className="text-xl font-bold capitalize">{department}</h1>
@@ -180,17 +192,20 @@ const deptMenus = {
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center space-x-3 p-2 hover:bg-gray-100 rounded-lg"
                 >
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-sm">
-                      {user?.nom.charAt(0)}{user?.prenom?.charAt(0)}
-                    </span>
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                    {user?.photo_profil ? (
+                      <img src={user.photo_profil} alt="Photo de profil" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-white font-bold text-sm">
+                        {user?.nom.charAt(0)}{user?.prenom?.charAt(0)}
+                      </span>
+                    )}
                   </div>
                 </button>
 
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border z-50">
                     <Link href="/profile" className="block px-4 py-2 hover:bg-gray-100 rounded-t-lg">Profil</Link>
-                    <Link href="/profile/photo" className="block px-4 py-2 hover:bg-gray-100">Photo</Link>
                     <div className="border-t" />
                     <button onClick={handleLogout} className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 rounded-b-lg">
                       Déconnexion

@@ -9,17 +9,18 @@ import {
 import { BackButton } from '@/components/BackButton';
 import { AlertContainer } from '@/components/Alert';
 import { usePageState } from '@/hooks/usePageState';
+import { assuranceApi } from '@/services/api/assurance.api';
 
 interface Assure {
   id: number;
   code_assure: string;
-  type_assure: 'PARTICULIER' | 'ENTREPRISE';
+  type_assure: string;
   nom: string;
   prenom: string;
   email: string;
   telephone: string;
   adresse: string;
-  date_creation: string;
+  date_creation?: string;
 }
 
 export default function AssuresPageV2() {
@@ -65,12 +66,8 @@ export default function AssuresPageV2() {
   const loadAssures = async () => {
     try {
       setLoading(true);
-      // Mock data pour test
-      setAssures([
-        { id: 1, code_assure: 'ASS-001', type_assure: 'PARTICULIER', nom: 'Konan', prenom: 'Jean', email: 'jean.konan@email.com', telephone: '0123456789', adresse: 'Cocody, Abidjan', date_creation: '2026-01-10' },
-        { id: 2, code_assure: 'ASS-002', type_assure: 'PARTICULIER', nom: 'Diallo', prenom: 'Aminata', email: 'aminata.diallo@email.com', telephone: '0234567890', adresse: 'Plateau, Abidjan', date_creation: '2026-01-15' },
-        { id: 3, code_assure: 'ASS-003', type_assure: 'ENTREPRISE', nom: 'Tech Solutions', prenom: '', email: 'contact@techsolutions.ci', telephone: '0345678901', adresse: 'Marcory, Abidjan', date_creation: '2026-02-01' },
-      ]);
+      const data = await assuranceApi.getAssures();
+      setAssures(data as unknown as Assure[]);
     } catch (err: any) {
       setError(`Erreur chargement: ${err.message}`);
     } finally {
@@ -81,14 +78,14 @@ export default function AssuresPageV2() {
   const loadAssureById = async (id: number) => {
     try {
       setLoading(true);
-      const assure = assures.find(a => a.id === id);
+      const assure = await assuranceApi.getAssure(id);
       if (!assure) {
         setError('Assuré non trouvé');
         return;
       }
       setSelectedAssure(assure);
       setFormData({
-        type_assure: assure.type_assure,
+        type_assure: assure.type_assure === 'ENTREPRISE' ? 'ENTREPRISE' : 'PARTICULIER',
         nom: assure.nom,
         prenom: assure.prenom,
         email: assure.email,
@@ -110,8 +107,16 @@ export default function AssuresPageV2() {
 
     try {
       setLoading(true);
-      // Simuler création
-      await new Promise(r => setTimeout(r, 500));
+      await assuranceApi.createAssure({
+        type_assure: formData.type_assure,
+        nom: formData.nom,
+        prenom: formData.prenom,
+        email: formData.email,
+        telephone: formData.telephone,
+        adresse: formData.adresse,
+        date_naissance: '',
+        entreprise: formData.type_assure === 'ENTREPRISE' ? formData.nom : ''
+      } as any);
       setSuccess('Assuré créé avec succès');
       setTimeout(() => router.push('/dashboard/assurance/assures'), 1500);
     } catch (err: any) {

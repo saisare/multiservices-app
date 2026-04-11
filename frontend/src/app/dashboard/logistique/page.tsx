@@ -1,55 +1,45 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Package, Truck, AlertTriangle, TrendingUp, Plus, Search, Filter } from 'lucide-react';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, ArrowRight, Package, Truck, Warehouse } from 'lucide-react';
 import Link from 'next/link';
-import { logistiqueApi, type Stats } from '@/services/api/logistique.api.ts';
-
-interface LocalStats {
-  totalProduits: number;
-  produitsFaibleStock: number;
-  valeurStock: number;
-  commandesEnCours: number;
-}
+import { logistiqueApi, type Commande, type Livraison, type Stats } from '@/services/api/logistique.api';
 
 export default function LogistiquePage() {
-  const [stats, setStats] = useState({
-    totalProduits: 0,
-    produitsFaibleStock: 0,
-    valeurStock: 0,
-    commandesEnCours: 0
-  });
+  const [stats, setStats] = useState<Stats>({ total_produits: 0, alertes_non_traitees: 0, commandes_en_cours: 0, valeur_stock: 0 });
+  const [commandes, setCommandes] = useState<Commande[]>([]);
+  const [livraisons, setLivraisons] = useState<Livraison[]>([]);
   const [loading, setLoading] = useState(true);
 
-const loadStats = useCallback(async () => {
+  const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await logistiqueApi.getStats();
-      setStats({
-        totalProduits: data.total_produits || 0,
-        produitsFaibleStock: data.alertes_non_traitees || 0,
-        valeurStock: data.valeur_stock || 0,
-        commandesEnCours: data.commandes_en_cours || 0
-      });
-    } catch (err) {
-      console.error('Error loading stats:', err);
-      // Fallback
-      setStats({ totalProduits: 0, produitsFaibleStock: 0, valeurStock: 0, commandesEnCours: 0 });
+      const [statsData, commandesData, livraisonsData] = await Promise.all([
+        logistiqueApi.getStats(),
+        logistiqueApi.getCommandes(),
+        logistiqueApi.getLivraisons(),
+      ]);
+      setStats(statsData);
+      setCommandes(commandesData);
+      setLivraisons(livraisonsData);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+    loadDashboard();
+  }, [loadDashboard]);
+
+  const recentOrders = useMemo(() => commandes.slice(0, 5), [commandes]);
+  const recentDeliveries = useMemo(() => livraisons.slice(0, 5), [livraisons]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Chargement du tableau de bord Logistique...</p>
+          <div className="mx-auto mb-4 h-14 w-14 animate-spin rounded-full border-4 border-cyan-200 border-t-slate-900" />
+          <p className="text-slate-600">Chargement du tableau de bord...</p>
         </div>
       </div>
     );
@@ -57,128 +47,135 @@ const loadStats = useCallback(async () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Service Logistique</h1>
-          <p className="text-gray-600 mt-2">Gestion des produits, stocks et livraisons</p>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            href="/dashboard/logistique/produits/nouveau"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nouveau produit
-          </Link>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl border p-6">
-          <div className="flex items-center justify-between">
-            <Package className="w-8 h-8 text-blue-500" />
-            <span className="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded-full">
-              {stats.totalProduits}
-            </span>
+      <section className="rounded-[28px] border border-slate-800 bg-[linear-gradient(135deg,#04111f_0%,#0b1d36_45%,#0a3144_100%)] px-6 py-8 text-white shadow-xl">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-cyan-200/80">Pilotage logistique</p>
+            <h1 className="mt-2 text-3xl font-semibold">Tableau de bord</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-300">
+              Suivez les stocks, les flux de commandes et l’avancement des livraisons depuis un cockpit unifié.
+            </p>
           </div>
-          <p className="text-2xl font-bold mt-2">{stats.totalProduits}</p>
-          <p className="text-sm text-gray-600">Produits en stock</p>
-        </div>
-
-        <div className="bg-white rounded-xl border p-6">
-          <div className="flex items-center justify-between">
-            <AlertTriangle className="w-8 h-8 text-red-500" />
-            <span className="text-xs font-medium px-2 py-1 bg-red-100 text-red-700 rounded-full">
-              {stats.produitsFaibleStock}
-            </span>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Link href="/dashboard/logistique/produits" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm transition hover:bg-white/10">
+              Catalogue et stock
+            </Link>
+            <Link href="/dashboard/logistique/livraisons" className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm transition hover:bg-cyan-400/20">
+              Centre de livraisons
+            </Link>
           </div>
-          <p className="text-2xl font-bold mt-2">{stats.produitsFaibleStock}</p>
-          <p className="text-sm text-gray-600">Stock faible</p>
         </div>
+      </section>
 
-        <div className="bg-white rounded-xl border p-6">
-          <div className="flex items-center justify-between">
-            <TrendingUp className="w-8 h-8 text-green-500" />
-            <span className="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded-full">
-              €{stats.valeurStock.toLocaleString()}
-            </span>
-          </div>
-          <p className="text-2xl font-bold mt-2">€{stats.valeurStock.toLocaleString()}</p>
-          <p className="text-sm text-gray-600">Valeur du stock</p>
-        </div>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Produits référencés" value={String(stats.total_produits)} icon={<Package className="h-5 w-5" />} tone="cyan" />
+        <MetricCard label="Alertes de stock" value={String(stats.alertes_non_traitees)} icon={<AlertTriangle className="h-5 w-5" />} tone="amber" />
+        <MetricCard label="Valeur du stock" value={`${Number(stats.valeur_stock || 0).toLocaleString('fr-FR')} FCFA`} icon={<Warehouse className="h-5 w-5" />} tone="sky" />
+        <MetricCard label="Commandes en cours" value={String(stats.commandes_en_cours)} icon={<Truck className="h-5 w-5" />} tone="slate" />
+      </section>
 
-        <div className="bg-white rounded-xl border p-6">
-          <div className="flex items-center justify-between">
-            <Truck className="w-8 h-8 text-purple-500" />
-            <span className="text-xs font-medium px-2 py-1 bg-purple-100 text-purple-700 rounded-full">
-              {stats.commandesEnCours}
-            </span>
-          </div>
-          <p className="text-2xl font-bold mt-2">{stats.commandesEnCours}</p>
-          <p className="text-sm text-gray-600">Commandes en cours</p>
-        </div>
-      </div>
-
-      {/* Actions rapides */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link
-          href="/dashboard/logistique/produits"
-          className="bg-white rounded-xl border p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center">
-            <Package className="w-10 h-10 text-blue-500 mr-4" />
+      <section className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Gestion Produits</h3>
-              <p className="text-gray-600">Ajouter, modifier, consulter les produits</p>
+              <h2 className="text-xl font-semibold text-slate-900">Commandes récentes</h2>
+              <p className="mt-1 text-sm text-slate-500">Dernières demandes clients en traitement.</p>
             </div>
+            <Link href="/dashboard/logistique/commandes" className="inline-flex items-center gap-2 text-sm font-medium text-cyan-700">
+              Ouvrir la gestion
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-        </Link>
+          <div className="space-y-3">
+            {recentOrders.map((commande) => (
+              <div key={commande.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-semibold text-slate-900">{commande.numero_commande}</p>
+                    <p className="text-sm text-slate-600">{commande.client_nom}</p>
+                  </div>
+                  <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">{commande.statut}</span>
+                </div>
+                <p className="mt-3 text-sm text-slate-500">
+                  Total TTC: {Number(commande.total_ttc || 0).toLocaleString('fr-FR')} FCFA
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
 
-        <Link
-          href="/dashboard/logistique/commandes"
-          className="bg-white rounded-xl border p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center">
-            <Truck className="w-10 h-10 text-green-500 mr-4" />
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Commandes</h3>
-              <p className="text-gray-600">Gérer les commandes fournisseurs</p>
+              <h2 className="text-xl font-semibold text-slate-900">Livraisons prioritaires</h2>
+              <p className="mt-1 text-sm text-slate-500">Suivi opérationnel des envois récents.</p>
             </div>
+            <Link href="/dashboard/logistique/livraisons" className="inline-flex items-center gap-2 text-sm font-medium text-cyan-700">
+              Voir tout
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-        </Link>
-
-        <Link
-          href="/dashboard/logistique/livraison"
-          className="bg-white rounded-xl border p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center">
-            <TrendingUp className="w-10 h-10 text-purple-500 mr-4" />
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Livraisons</h3>
-              <p className="text-gray-600">Suivre les livraisons et réceptions</p>
-            </div>
+          <div className="space-y-3">
+            {recentDeliveries.map((livraison) => (
+              <div key={livraison.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-900">{livraison.commande_numero}</p>
+                    <p className="text-sm text-slate-600">{livraison.client_nom}</p>
+                  </div>
+                  <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-medium text-cyan-800">{livraison.statut}</span>
+                </div>
+                <p className="mt-3 text-sm text-slate-500">
+                  Transporteur: {livraison.transporteur || 'Non renseigné'}
+                </p>
+              </div>
+            ))}
           </div>
-        </Link>
-      </div>
+        </div>
+      </section>
 
-      {/* Section alertes stock */}
-      {stats.produitsFaibleStock > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
+      {stats.alertes_non_traitees > 0 ? (
+        <section className="rounded-[28px] border border-amber-200 bg-amber-50 p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-700" />
             <div>
-              <h3 className="text-sm font-medium text-yellow-800">
-                Alerte stock - {stats.produitsFaibleStock} produit(s) en rupture
-              </h3>
-              <p className="text-sm text-yellow-700 mt-1">
-                Certains produits sont en dessous du seuil de réapprovisionnement.
+              <h2 className="font-semibold text-amber-900">Réapprovisionnement à surveiller</h2>
+              <p className="mt-1 text-sm text-amber-800">
+                {stats.alertes_non_traitees} alerte(s) de stock nécessitent une action sur les produits ou les entrées.
               </p>
             </div>
           </div>
-        </div>
-      )}
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  icon: ReactNode;
+  tone: 'cyan' | 'amber' | 'sky' | 'slate';
+}) {
+  const tones = {
+    cyan: 'border-cyan-200 bg-cyan-50 text-cyan-800',
+    amber: 'border-amber-200 bg-amber-50 text-amber-800',
+    sky: 'border-sky-200 bg-sky-50 text-sky-800',
+    slate: 'border-slate-200 bg-slate-50 text-slate-800',
+  };
+
+  return (
+    <div className={`rounded-[28px] border p-5 shadow-sm ${tones[tone]}`}>
+      <div className="flex items-center justify-between">
+        <div className="rounded-2xl bg-white/70 p-3">{icon}</div>
+        <span className="text-2xl font-semibold">{value}</span>
+      </div>
+      <p className="mt-4 text-sm font-medium">{label}</p>
     </div>
   );
 }

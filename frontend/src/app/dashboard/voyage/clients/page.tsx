@@ -6,9 +6,10 @@ import Link from 'next/link';
 import {
   Users, Search, Filter, Plus, Eye, Edit, Trash2,
   ArrowLeft, Save, X, AlertCircle, CheckCircle,
-  Mail, Phone, MapPin, Calendar, Globe, Passport,
+  Mail, Phone, MapPin, Calendar, Globe,
   Building2, User, Briefcase, Plane
 } from 'lucide-react';
+import { voyageApi } from '@/services/api/voyage.api';
 
 interface Client {
   id: number;
@@ -82,42 +83,70 @@ export default function ClientsVoyagePage() {
   const loadClients = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setClients([
-        { id: 1, code_client: 'CLT-001', type_client: 'PARTICULIER', nom: 'Konan', prenom: 'Jean', entreprise: '', date_naissance: '1990-05-15', nationalite: 'Ivoirienne', passport_number: 'PA123456', passport_expiration: '2028-12-31', email: 'jean.konan@email.com', telephone: '0123456789', adresse: 'Cocody, Abidjan', date_creation: '2026-01-10' },
-        { id: 2, code_client: 'CLT-002', type_client: 'PARTICULIER', nom: 'Diallo', prenom: 'Aminata', entreprise: '', date_naissance: '1985-08-22', nationalite: 'Sénégalaise', passport_number: 'PA789012', passport_expiration: '2027-06-30', email: 'aminata.diallo@email.com', telephone: '0234567890', adresse: 'Plateau, Abidjan', date_creation: '2026-01-15' },
-        { id: 3, code_client: 'CLT-003', type_client: 'ENTREPRISE', nom: 'Tech Solutions', prenom: '', entreprise: 'Tech Solutions SARL', date_naissance: '', nationalite: '', passport_number: '', passport_expiration: '', email: 'contact@techsolutions.ci', telephone: '0345678901', adresse: 'Marcory, Abidjan', date_creation: '2026-02-01' },
+      const [clientsData, reservationsData, dossiersData] = await Promise.all([
+        voyageApi.getVoyageClients(),
+        voyageApi.getReservations(),
+        voyageApi.getDossiers()
       ]);
+
+      setClients((clientsData as any[]).map((client) => ({
+        ...client,
+        code_client: client.code_client || `CLT-${String(client.id).padStart(4, '0')}`,
+        type_client: client.type_client || 'PARTICULIER',
+        entreprise: client.entreprise || '',
+        date_naissance: client.date_naissance || '',
+        nationalite: client.nationalite || '',
+        passport_number: client.passport_number || '',
+        passport_expiration: client.passport_expiration || '',
+        adresse: client.adresse || '',
+        date_creation: client.date_creation || new Date().toISOString()
+      })));
+      setReservations(reservationsData as Reservation[]);
+      setDossiers(dossiersData as Dossier[]);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   const loadClient = async (id: number) => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const mockClient: Client = { id, code_client: 'CLT-001', type_client: 'PARTICULIER', nom: 'Konan', prenom: 'Jean', entreprise: '', date_naissance: '1990-05-15', nationalite: 'Ivoirienne', passport_number: 'PA123456', passport_expiration: '2028-12-31', email: 'jean.konan@email.com', telephone: '0123456789', adresse: 'Cocody, Abidjan', date_creation: '2026-01-10' };
-      setClient(mockClient);
+      const [clientsData, reservationsData, dossiersData] = await Promise.all([
+        voyageApi.getVoyageClients(),
+        voyageApi.getReservations(),
+        voyageApi.getDossiers()
+      ]);
+      const selectedClient = (clientsData as any[]).find((item) => item.id === id);
+      if (!selectedClient) {
+        throw new Error('Client introuvable');
+      }
+      const normalizedClient = {
+        ...selectedClient,
+        code_client: selectedClient.code_client || `CLT-${String(selectedClient.id).padStart(4, '0')}`,
+        type_client: selectedClient.type_client || 'PARTICULIER',
+        entreprise: selectedClient.entreprise || '',
+        date_naissance: selectedClient.date_naissance || '',
+        nationalite: selectedClient.nationalite || '',
+        passport_number: selectedClient.passport_number || '',
+        passport_expiration: selectedClient.passport_expiration || '',
+        adresse: selectedClient.adresse || '',
+        date_creation: selectedClient.date_creation || new Date().toISOString()
+      };
+      setClient(normalizedClient as Client);
       setFormData({
-        code_client: mockClient.code_client,
-        type_client: mockClient.type_client,
-        nom: mockClient.nom,
-        prenom: mockClient.prenom,
-        entreprise: mockClient.entreprise,
-        date_naissance: mockClient.date_naissance,
-        nationalite: mockClient.nationalite,
-        passport_number: mockClient.passport_number,
-        passport_expiration: mockClient.passport_expiration,
-        email: mockClient.email,
-        telephone: mockClient.telephone,
-        adresse: mockClient.adresse
+        code_client: normalizedClient.code_client,
+        type_client: normalizedClient.type_client,
+        nom: normalizedClient.nom,
+        prenom: normalizedClient.prenom,
+        entreprise: normalizedClient.entreprise,
+        date_naissance: normalizedClient.date_naissance,
+        nationalite: normalizedClient.nationalite,
+        passport_number: normalizedClient.passport_number,
+        passport_expiration: normalizedClient.passport_expiration,
+        email: normalizedClient.email,
+        telephone: normalizedClient.telephone,
+        adresse: normalizedClient.adresse
       });
-      setReservations([
-        { id: 1, code_reservation: 'RES-2024-001', destination: 'Paris', date_depart: '2024-06-15', statut: 'CONFIRMEE' },
-        { id: 2, code_reservation: 'RES-2024-002', destination: 'Berlin', date_depart: '2024-07-10', statut: 'EN_ATTENTE' },
-      ]);
-      setDossiers([
-        { id: 1, numero_dossier: 'DOS-2024-001', type_demande: 'VISA_ETUDIANT', statut: 'EN_INSTRUCTION' },
-      ]);
+      setReservations((reservationsData as Reservation[]).filter((item: any) => item.client_id === id));
+      setDossiers(dossiersData as Dossier[]);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
@@ -128,7 +157,12 @@ export default function ClientsVoyagePage() {
     }
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await voyageApi.createVoyageClient({
+        nom: formData.nom,
+        prenom: formData.prenom,
+        email: formData.email,
+        telephone: formData.telephone
+      });
       setSuccess('Client créé avec succès');
       setTimeout(() => { setMode('list'); loadClients(); }, 1500);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }

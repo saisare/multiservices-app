@@ -17,7 +17,7 @@ const db = mysql.createConnection({
     port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || undefined,
-    database: process.env.DB_NAME || 'auth_db',
+    database: process.env.DB_NAME || 'assurance_db',
     charset: 'utf8mb4'
 });
 
@@ -150,7 +150,98 @@ app.get('/api/experts', verifyToken, (req, res) => {
     });
 });
 
+app.get('/api/contrats-assurance', verifyToken, (req, res) => {
+    const sql = `
+        SELECT c.*, a.code_assure, a.nom AS assure_nom, a.prenom AS assure_prenom
+        FROM contrats_assurance c
+        LEFT JOIN assures a ON c.assure_id = a.id
+        ORDER BY c.date_creation DESC, c.id DESC
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+app.post('/api/contrats-assurance', verifyToken, (req, res) => {
+    const { assure_id, type_assurance, date_effet, date_echeance, montant, statut } = req.body;
+
+    if (!assure_id || !type_assurance || !date_effet) {
+        return res.status(400).json({ error: 'assure_id, type_assurance et date_effet sont requis' });
+    }
+
+    const numero_contrat = `CTR-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
+    const sql = `INSERT INTO contrats_assurance
+                 (numero_contrat, assure_id, type_assurance, date_effet, date_echeance, montant, statut)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+    db.query(
+        sql,
+        [numero_contrat, assure_id, type_assurance, date_effet, date_echeance || null, montant || null, statut || 'ACTIF'],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.status(201).json({ id: result.insertId, numero_contrat, message: 'Contrat créé avec succès' });
+        }
+    );
+});
+
+app.get('/api/reglements', verifyToken, (req, res) => {
+    const sql = `
+        SELECT r.*, s.numero_sinistre, p.numero_police,
+               a.nom AS assure_nom, a.prenom AS assure_prenom
+        FROM reglements r
+        JOIN sinistres s ON r.sinistre_id = s.id
+        JOIN polices_assurance p ON s.police_id = p.id
+        JOIN assures a ON p.assure_id = a.id
+        ORDER BY r.date_creation DESC, r.id DESC
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+app.post('/api/reglements', verifyToken, (req, res) => {
+    const { sinistre_id, montant, date_reglement, mode_reglement, reference, beneficiaire, notes } = req.body;
+
+    if (!sinistre_id || !montant || !date_reglement || !mode_reglement) {
+        return res.status(400).json({ error: 'sinistre_id, montant, date_reglement et mode_reglement sont requis' });
+    }
+
+    const sql = `INSERT INTO reglements
+                 (sinistre_id, montant, date_reglement, mode_reglement, reference, beneficiaire, notes)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`;
+
+    db.query(
+        sql,
+        [sinistre_id, montant, date_reglement, mode_reglement, reference || null, beneficiaire || null, notes || null],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.status(201).json({ id: result.insertId, message: 'Règlement enregistré avec succès' });
+        }
+    );
+});
+
+app.get('/api/stats', verifyToken, (req, res) => {
+    const sql = `
+        SELECT
+            (SELECT COUNT(*) FROM assures) AS total_assures,
+            (SELECT COUNT(*) FROM polices_assurance) AS total_polices,
+            (SELECT COUNT(*) FROM sinistres) AS total_sinistres,
+            (SELECT COUNT(*) FROM experts WHERE actif = 1) AS total_experts,
+            (SELECT COUNT(*) FROM contrats_assurance) AS total_contrats,
+            (SELECT COUNT(*) FROM reglements) AS total_reglements,
+            (SELECT COALESCE(SUM(montant), 0) FROM reglements) AS montant_regle
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results[0] || {});
+    });
+});
+
 app.listen(PORT, process.env.HOST || '0.0.0.0', () => {
     console.log(`Service assurance demarre sur http://localhost:${PORT}`);
 });
-

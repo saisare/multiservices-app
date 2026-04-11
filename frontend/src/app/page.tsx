@@ -171,39 +171,8 @@ export default function HomePage() {
 
         </div>
 
-        {/* Info Section */}
-        <div className="mt-20 max-w-3xl mx-auto">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-8">
-            <h3 className="text-white font-semibold text-lg mb-6">🔐 Architecture de Sécurité</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-blue-400 font-semibold mb-3">Portail Administrateur</h4>
-                <ul className="space-y-2 text-gray-400 text-sm">
-                  <li>✅ Interface dédiée et sécurisée</li>
-                  <li>✅ Séparation des concerns</li>
-                  <li>✅ Authentification BCRYPT</li>
-                  <li>✅ JWT tokens signés</li>
-                  <li>✅ Audit trail complet</li>
-                  <li>✅ SameSite Cookies Strict</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="text-blue-400 font-semibold mb-3">Portail Principal</h4>
-                <ul className="space-y-2 text-gray-400 text-sm">
-                  <li>✅ Login personnalisé par département</li>
-                  <li>✅ 4 rôles: Admin, Directeur, Secrétaire, Employé</li>
-                  <li>✅ Control d'accès granulaire</li>
-                  <li>✅ Authentification sécurisée</li>
-                  <li>✅ Multi-langue support</li>
-                  <li>✅ Sessions 24h</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Footer */}
-        <div className="mt-16 text-center text-gray-500 text-sm">
+        <div className="mt-20 text-center text-gray-500 text-sm">
           <p>BLG-ENGINEERING © 2026 | Système Intégré Professionnel</p>
           <p className="mt-2">v3.0 | Tous droits réservés</p>
         </div>

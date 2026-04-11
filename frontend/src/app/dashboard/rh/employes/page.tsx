@@ -10,6 +10,7 @@ import {
   User, Calendar as CalendarIcon, Clock, Filter,
   UserPlus, UserMinus, Award, DollarSign
 } from 'lucide-react';
+import { rhApi } from '@/services/api/rh.api';
 
 interface Employe {
   id: number;
@@ -29,6 +30,8 @@ interface Employe {
 
 interface Conge {
   id: number;
+  employe_nom?: string;
+  employe_prenom?: string;
   type_conge: string;
   date_debut: string;
   date_fin: string;
@@ -86,57 +89,90 @@ export default function EmployesPage() {
   const loadEmployes = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setEmployes([
-        { id: 1, matricule: 'EMP-001', nom: 'Konan', prenom: 'Jean', email: 'jean.konan@email.com', telephone: '0123456789', poste: 'Développeur', departement: 'IT', date_embauche: '2023-01-15', salaire_base: 400000, genre: 'M', adresse: 'Cocody', actif: true },
-        { id: 2, matricule: 'EMP-002', nom: 'Diallo', prenom: 'Aminata', email: 'aminata.diallo@email.com', telephone: '0234567890', poste: 'Comptable', departement: 'Finance', date_embauche: '2023-03-10', salaire_base: 350000, genre: 'F', adresse: 'Plateau', actif: true },
-        { id: 3, matricule: 'EMP-003', nom: 'Touré', prenom: 'Amadou', email: 'amadou.toure@email.com', telephone: '0345678901', poste: 'Chef de projet', departement: 'IT', date_embauche: '2022-06-01', salaire_base: 550000, genre: 'M', adresse: 'Marcory', actif: true },
+      const [employesData, congesData] = await Promise.all([
+        rhApi.getEmployes(),
+        rhApi.getConges(),
       ]);
+      setEmployes(employesData as unknown as Employe[]);
+      setConges(congesData as unknown as Conge[]);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   const loadEmploye = async (id: number) => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const mock: Employe = { id, matricule: 'EMP-001', nom: 'Konan', prenom: 'Jean', email: 'jean.konan@email.com', telephone: '0123456789', poste: 'Développeur', departement: 'IT', date_embauche: '2023-01-15', salaire_base: 400000, genre: 'M', adresse: 'Cocody', actif: true };
-      setEmploye(mock);
-      setFormData({
-        matricule: mock.matricule,
-        nom: mock.nom,
-        prenom: mock.prenom,
-        email: mock.email,
-        telephone: mock.telephone,
-        poste: mock.poste,
-        departement: mock.departement,
-        date_embauche: mock.date_embauche,
-        salaire_base: mock.salaire_base.toString(),
-        genre: mock.genre,
-        adresse: mock.adresse,
-        actif: mock.actif
-      });
-      setConges([
-        { id: 1, type_conge: 'ANNUEL', date_debut: '2026-03-20', date_fin: '2026-04-03', nb_jours: 15, motif: 'Vacances', statut: 'VALIDE', date_demande: '2026-02-15' },
-        { id: 2, type_conge: 'MALADIE', date_debut: '2026-02-10', date_fin: '2026-02-12', nb_jours: 3, motif: 'Maladie', statut: 'VALIDE', date_demande: '2026-02-10' },
+      const [currentEmploye, employeConges] = await Promise.all([
+        rhApi.getEmploye(id),
+        rhApi.getCongesEmploye(id),
       ]);
+
+      if (!currentEmploye) {
+        throw new Error('Employé introuvable');
+      }
+
+      setEmploye(currentEmploye as unknown as Employe);
+      setFormData({
+        matricule: currentEmploye.matricule || '',
+        nom: currentEmploye.nom || '',
+        prenom: currentEmploye.prenom || '',
+        email: currentEmploye.email || '',
+        telephone: currentEmploye.telephone || '',
+        poste: currentEmploye.poste || '',
+        departement: currentEmploye.departement || '',
+        date_embauche: currentEmploye.date_embauche ? currentEmploye.date_embauche.slice(0, 10) : '',
+        salaire_base: String(currentEmploye.salaire_base || ''),
+        genre: currentEmploye.genre || 'M',
+        adresse: currentEmploye.adresse || '',
+        actif: Boolean(currentEmploye.actif)
+      });
+      setConges(employeConges as Conge[]);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   const handleCreate = async () => {
-    if (!formData.nom || !formData.prenom || !formData.email) { setError('Nom, prénom et email requis'); return; }
+    if (!formData.nom || !formData.prenom || !formData.poste || !formData.date_embauche) { setError('Nom, prénom, poste et date d\'embauche requis'); return; }
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      if (mode === 'edit' && employe) {
+        await rhApi.updateEmploye(employe.id, {
+          nom: formData.nom,
+          prenom: formData.prenom,
+          poste: formData.poste,
+          date_embauche: formData.date_embauche,
+          salaire_base: Number(formData.salaire_base || 0)
+        });
+        setSuccess('Employé mis à jour');
+        setTimeout(() => { setMode('detail'); loadEmploye(employe.id); }, 1000);
+        return;
+      }
+
+      await rhApi.createEmploye({
+        nom: formData.nom,
+        prenom: formData.prenom,
+        genre: formData.genre,
+        email: formData.email,
+        telephone: formData.telephone,
+        poste: formData.poste,
+        departement: formData.departement,
+        date_embauche: formData.date_embauche,
+        salaire_base: Number(formData.salaire_base || 0)
+      } as any);
       setSuccess('Employé créé');
       setTimeout(() => { setMode('list'); loadEmployes(); }, 1500);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   const handleCreateConge = async () => {
-    if (!congeForm.date_debut || !congeForm.date_fin) { setError('Dates requises'); return; }
+    if (!employe || !congeForm.date_debut || !congeForm.date_fin) { setError('Dates requises'); return; }
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await rhApi.createConge({
+        employe_id: employe.id,
+        type_conge: congeForm.type_conge,
+        date_debut: congeForm.date_debut,
+        date_fin: congeForm.date_fin,
+        motif: congeForm.motif
+      });
       setSuccess('Demande de congé envoyée');
       setShowCongeForm(false);
       setTimeout(() => { if (employe) loadEmploye(employe.id); }, 1500);
@@ -145,7 +181,7 @@ export default function EmployesPage() {
 
   const updateCongeStatut = async (congeId: number, statut: string) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await rhApi.updateCongeStatut(congeId, statut);
       setConges(conges.map(c => c.id === congeId ? { ...c, statut } : c));
       setSuccess(`Congé ${statut === 'VALIDE' ? 'validé' : 'refusé'}`);
       setTimeout(() => setSuccess(''), 3000);
@@ -198,7 +234,7 @@ export default function EmployesPage() {
 
           {/* Liste des congés */}
           {tab === 'conges' && (
-            <div className="bg-white rounded-xl border overflow-hidden"><table className="w-full"><thead className="bg-gray-50"><tr><th className="px-6 py-3 text-left">Employé</th><th>Type</th><th>Dates</th><th>Jours</th><th>Motif</th><th>Statut</th></tr></thead><tbody>{conges.map(c => (<tr key={c.id} className="hover:bg-gray-50"><td className="px-6 py-4">—</td><td>{c.type_conge}</td><td>{new Date(c.date_debut).toLocaleDateString('fr-FR')} → {new Date(c.date_fin).toLocaleDateString('fr-FR')}</td><td>{c.nb_jours}</td><td>{c.motif}</td><td><span className={`px-2 py-1 rounded-full text-xs ${c.statut === 'VALIDE' ? 'bg-green-100 text-green-700' : c.statut === 'EN_ATTENTE' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{c.statut}</span></td></tr>))}</tbody></table></div>
+            <div className="bg-white rounded-xl border overflow-hidden"><table className="w-full"><thead className="bg-gray-50"><tr><th className="px-6 py-3 text-left">Employé</th><th>Type</th><th>Dates</th><th>Jours</th><th>Motif</th><th>Statut</th></tr></thead><tbody>{conges.map(c => (<tr key={c.id} className="hover:bg-gray-50"><td className="px-6 py-4">{[c.employe_prenom, c.employe_nom].filter(Boolean).join(' ') || (employe ? `${employe.prenom} ${employe.nom}` : '—')}</td><td>{c.type_conge}</td><td>{new Date(c.date_debut).toLocaleDateString('fr-FR')} → {new Date(c.date_fin).toLocaleDateString('fr-FR')}</td><td>{c.nb_jours}</td><td>{c.motif}</td><td><span className={`px-2 py-1 rounded-full text-xs ${c.statut === 'VALIDE' ? 'bg-green-100 text-green-700' : c.statut === 'EN_ATTENTE' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{c.statut}</span></td></tr>))}</tbody></table></div>
           )}
         </>
       )}

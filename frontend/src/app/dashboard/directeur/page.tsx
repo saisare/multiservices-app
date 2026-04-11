@@ -1,75 +1,110 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Bell, Briefcase, EyeOff, LogOut, ShieldCheck, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
-  BarChart3, TrendingUp, Users, AlertCircle, CheckCircle,
-  Eye, Download, Filter, Clock, DollarSign, Briefcase,
-  Settings, LogOut, Bell, Search
-} from 'lucide-react';
-import { buildServiceBase } from '@/lib/runtime-api';
+  getConnectionLogs,
+  getMonitoringOverview,
+  getNotifications,
+  getUsers,
+  hideUser,
+  type ConnectionLog,
+  type Notification,
+  type User,
+} from '@/services/api/admin.api';
 
-const API_BASE = buildServiceBase(3002);
-
-interface DashboardStats {
-  total_users: number;
-  active_users: number;
-  pending_approvals: number;
-  services_active: number;
-  total_revenue?: number;
-  active_projects?: number;
-}
-
-interface Alert {
-  id: number;
-  type: 'warning' | 'critical' | 'info';
-  title: string;
-  message: string;
-  timestamp: string;
-}
+type SessionUser = {
+  nom?: string;
+  prenom?: string;
+};
 
 export default function DirectorDashboard() {
   const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [userData, setUserData] = useState<any>(null);
+  const [error, setError] = useState('');
+  const [userData, setUserData] = useState<SessionUser | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [logs, setLogs] = useState<ConnectionLog[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [overview, setOverview] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    const savedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
 
-  const loadDashboardData = async () => {
+    if (!savedUser || !token) {
+      router.push('/login');
+      return;
+    }
+
+    setUserData(JSON.parse(savedUser));
+    loadDashboard();
+  }, [router]);
+
+  const loadDashboard = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      setUserData(user);
+      setLoading(true);
+      const [userRows, logRows, notificationRows, overviewRows] = await Promise.all([
+        getUsers(),
+        getConnectionLogs(30),
+        getNotifications(),
+        getMonitoringOverview(),
+      ]);
 
-      // Charger stats
-      const statsRes = await fetch(`${API_BASE}/api/auth/stats/dashboard`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
-
-      // Charger alertes
-      const alertsRes = await fetch(`${API_BASE}/api/alerts/critical`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (alertsRes.ok) {
-        const alertsData = await alertsRes.json();
-        setAlerts(alertsData);
-      }
-
+      setUsers(userRows);
+      setLogs(logRows);
+      setNotifications(notificationRows);
+      setOverview(overviewRows || {});
+      setError('');
+    } catch (dashboardError) {
+      setError((dashboardError as Error).message || 'Impossible de charger la supervision.');
+    } finally {
       setLoading(false);
-    } catch (error) {
-      console.error('Erreur chargement dashboard:', error);
-      setLoading(false);
+    }
+  };
+
+  const visibleUsers = useMemo(() => users.filter((user) => user.role !== 'admin'), [users]);
+  const activeUsers = useMemo(() => visibleUsers.filter((user) => user.actif === 1 && user.hidden === 0), [visibleUsers]);
+  const restrictedUsers = useMemo(() => visibleUsers.filter((user) => user.hidden === 1), [visibleUsers]);
+  const pendingUsers = useMemo(() => visibleUsers.filter((user) => user.actif === 0), [visibleUsers]);
+  const recentActivity = useMemo(() => logs.filter((log) => log.email).slice(0, 8), [logs]);
+
+  const departmentRows = useMemo(() => {
+    const labels: Record<string, string> = {
+      btp: 'BTP & Construction',
+      voyage: 'Voyage & Immigration',
+      rh: 'Ressources Humaines',
+      logistique: 'Logistique',
+      assurance: 'Assurance',
+      communication: 'Communication',
+      secretaire: 'Secrétariat',
+      pdg: 'Direction Générale',
+      direction: 'Direction Générale',
+    };
+
+    const counts = visibleUsers.reduce<Record<string, number>>((acc, user) => {
+      const key = user.departement || 'non-defini';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.entries(counts)
+      .map(([key, count]) => ({
+        key,
+        label: labels[key] || key,
+        count,
+        active: visibleUsers.filter((user) => user.departement === key && user.hidden === 0 && user.actif === 1).length,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [visibleUsers]);
+
+  const handleHideUser = async (id: number) => {
+    try {
+      await hideUser(id);
+      await loadDashboard();
+    } catch (hideError) {
+      setError((hideError as Error).message || 'Impossible de restreindre ce compte.');
     }
   };
 
@@ -78,228 +113,216 @@ export default function DirectorDashboard() {
     router.push('/login');
   };
 
-  const handleGenerateReport = (type: string) => {
-    console.log('Générer rapport:', type);
-    // API call pour générer rapport PDF/Excel
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
-        <div className="text-white text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4 mx-auto"></div>
-          <p>Chargement du tableau de bord...</p>
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-slate-700 border-t-slate-100" />
+          <p>Chargement de la supervision direction...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-      {/* Header */}
-      <div className="bg-black/30 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Briefcase className="w-8 h-8 text-blue-400" />
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.16),_transparent_28%),linear-gradient(160deg,#020617_0%,#0f172a_55%,#111827_100%)]">
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-amber-300">
+              <Briefcase className="h-6 w-6" />
+            </div>
             <div>
-              <h1 className="text-white font-bold text-lg">Tableau de Bord Directeur</h1>
-              <p className="text-gray-400 text-sm">{userData?.nom} {userData?.prenom}</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Direction</p>
+              <h1 className="text-xl font-semibold text-white">Pilotage des comptes et activités</h1>
+              <p className="text-sm text-slate-400">{userData?.prenom} {userData?.nom}</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <button className="p-2 hover:bg-white/10 rounded-lg transition">
-              <Bell className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/admin/notifications')}
+              className="relative rounded-full border border-white/10 p-3 text-slate-200 transition hover:bg-white/10"
+            >
+              <Bell className="h-4 w-4" />
+              {notifications.filter((item) => !item.is_read).length > 0 ? (
+                <span className="absolute -right-1 -top-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold text-slate-950">
+                  {notifications.filter((item) => !item.is_read).length}
+                </span>
+              ) : null}
             </button>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg transition"
+              className="rounded-full border border-red-400/20 bg-red-500/10 px-4 py-2 text-sm text-red-200 transition hover:bg-red-500/20"
             >
-              <LogOut className="w-4 h-4 inline mr-2" />
+              <LogOut className="mr-2 inline h-4 w-4" />
               Déconnexion
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <main className="mx-auto max-w-7xl space-y-8 px-6 py-8">
+        {error ? (
+          <div className="rounded-3xl border border-red-400/20 bg-red-500/10 px-5 py-4 text-sm text-red-100">{error}</div>
+        ) : null}
 
-        {/* ALERTES CRITIQUES */}
-        {alerts.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-white font-bold text-lg mb-4 flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2 text-red-400" />
-              Alertes Critiques ({alerts.length})
-            </h2>
-            <div className="space-y-3">
-              {alerts.map(alert => (
-                <div key={alert.id} className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-start space-x-4">
-                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-red-300 font-semibold">{alert.title}</p>
-                    <p className="text-red-400/70 text-sm mt-1">{alert.message}</p>
-                    <p className="text-red-400/50 text-xs mt-2">{new Date(alert.timestamp).toLocaleString('fr-FR')}</p>
-                  </div>
-                </div>
-              ))}
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Comptes actifs" value={String(activeUsers.length)} hint="Collaborateurs visibles et autorisés à se connecter." icon={<Users className="h-5 w-5" />} />
+          <StatCard label="Comptes en attente" value={String(pendingUsers.length)} hint="Demandes encore en validation administrative." icon={<AlertCircle className="h-5 w-5" />} />
+          <StatCard label="Comptes restreints" value={String(restrictedUsers.length)} hint="Comptes masqués par décision de direction." icon={<EyeOff className="h-5 w-5" />} />
+          <StatCard label="Activités récentes" value={String(overview.total_connection_logs || logs.length)} hint="Connexions et partages enregistrés dans les journaux." icon={<ShieldCheck className="h-5 w-5" />} />
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[1.3fr,0.9fr]">
+          <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-slate-950/20">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Comptes opérationnels</h2>
+                <p className="mt-1 text-sm text-slate-400">Vue réelle des comptes visibles par la direction. Les comptes administrateur sont exclus.</p>
+              </div>
+              <button
+                onClick={loadDashboard}
+                className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-200 transition hover:bg-white/10"
+              >
+                Actualiser
+              </button>
             </div>
-          </div>
-        )}
 
-        {/* STATS PRINCIPALES */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Utilisateurs Actifs */}
-          <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <Users className="w-8 h-8 text-blue-400" />
-              <span className="text-blue-300 text-xs font-semibold bg-blue-500/20 px-2 py-1 rounded">PERSONNEL</span>
-            </div>
-            <p className="text-gray-400 text-sm mb-1">Utilisateurs Actifs</p>
-            <p className="text-white text-3xl font-bold">{stats?.active_users || 0}</p>
-            <p className="text-gray-500 text-xs mt-3">sur {stats?.total_users || 0} total</p>
-          </div>
-
-          {/* Approbations en Attente */}
-          <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <Clock className="w-8 h-8 text-yellow-400" />
-              <span className="text-yellow-300 text-xs font-semibold bg-yellow-500/20 px-2 py-1 rounded">ATTENTE</span>
-            </div>
-            <p className="text-gray-400 text-sm mb-1">Comptes à Approuver</p>
-            <p className="text-white text-3xl font-bold">{stats?.pending_approvals || 0}</p>
-            <button className="mt-3 text-blue-400 hover:text-blue-300 text-xs font-semibold">
-              → Voir détails
-            </button>
-          </div>
-
-          {/* Services Actifs */}
-          <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <BarChart3 className="w-8 h-8 text-green-400" />
-              <span className="text-green-300 text-xs font-semibold bg-green-500/20 px-2 py-1 rounded">SYSTÈMES</span>
-            </div>
-            <p className="text-gray-400 text-sm mb-1">Services Actifs</p>
-            <p className="text-white text-3xl font-bold">{stats?.services_active || 8}</p>
-            <p className="text-gray-500 text-xs mt-3">BTP, Voyage, Immigration, RH, etc.</p>
-          </div>
-
-          {/* Status Global */}
-          <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <CheckCircle className="w-8 h-8 text-purple-400" />
-              <span className="text-purple-300 text-xs font-semibold bg-purple-500/20 px-2 py-1 rounded">STATUS</span>
-            </div>
-            <p className="text-gray-400 text-sm mb-1">Statut Global</p>
-            <p className="text-white text-3xl font-bold">✅</p>
-            <p className="text-green-400 text-xs font-semibold mt-3">Tous les services opérationnels</p>
-          </div>
-        </div>
-
-        {/* ACTIONS DIRECTEUR */}
-        <div className="mb-8">
-          <h2 className="text-white font-bold text-lg mb-4">Actions Directeur</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Approuver Comptes */}
-            <button
-              onClick={() => router.push('/admin/approvals')}
-              className="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg p-6 transition group"
-            >
-              <CheckCircle className="w-8 h-8 text-blue-400 mb-3 group-hover:scale-110 transition" />
-              <h3 className="text-white font-semibold">Approuver Comptes</h3>
-              <p className="text-gray-400 text-sm mt-2">Gérer les demandes de compte en attente</p>
-            </button>
-
-            {/* Générer Rapports */}
-            <button
-              onClick={() => router.push('/reports/generate')}
-              className="bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg p-6 transition group"
-            >
-              <Download className="w-8 h-8 text-green-400 mb-3 group-hover:scale-110 transition" />
-              <h3 className="text-white font-semibold">Générer Rapports</h3>
-              <p className="text-gray-400 text-sm mt-2">Rapports mensuels, annuels, analyses</p>
-            </button>
-
-            {/* Superviseur Global */}
-            <button
-              onClick={() => router.push('/director/super-vision')}
-              className="bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded-lg p-6 transition group"
-            >
-              <Eye className="w-8 h-8 text-purple-400 mb-3 group-hover:scale-110 transition" />
-              <h3 className="text-white font-semibold">Vue Globale</h3>
-              <p className="text-gray-400 text-sm mt-2">Supervision complète de tous les services</p>
-            </button>
-          </div>
-        </div>
-
-        {/* SUPERVISION DES SERVICES */}
-        <div className="mb-8">
-          <h2 className="text-white font-bold text-lg mb-4">Supervision des Services</h2>
-          <div className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-white/5 border-b border-white/10">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-gray-400 font-semibold text-sm">Service</th>
-                    <th className="px-6 py-3 text-left text-gray-400 font-semibold text-sm">Statut</th>
-                    <th className="px-6 py-3 text-left text-gray-400 font-semibold text-sm">Utilisateurs</th>
-                    <th className="px-6 py-3 text-left text-gray-400 font-semibold text-sm">Actions Clés</th>
-                    <th className="px-6 py-3 text-left text-gray-400 font-semibold text-sm">Accès</th>
+              <table className="w-full min-w-[760px] text-left">
+                <thead>
+                  <tr className="border-b border-white/10 text-xs uppercase tracking-[0.2em] text-slate-400">
+                    <th className="pb-3">Compte</th>
+                    <th className="pb-3">Département</th>
+                    <th className="pb-3">Rôle</th>
+                    <th className="pb-3">Statut</th>
+                    <th className="pb-3">Dernière activité</th>
+                    <th className="pb-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {[
-                    { name: 'BTP & Construction', status: '🟢', users: 12, key: 'Chantiers: 8, Ouvriers: 45', route: '/director/btp' },
-                    { name: 'Service Voyage & Immigration', status: '🟢', users: 8, key: 'Clients: 15, Dossiers: 23', route: '/director/voyage' },
-                    { name: 'Ressources Humaines', status: '🟢', users: 6, key: 'Employés: 34, Congés: 2', route: '/director/rh' },
-                    { name: 'Service Logistique', status: '🟢', users: 5, key: 'Stock: OK, Commandes: 7', route: '/director/logistique' },
-                    { name: 'Assurances', status: '🟢', users: 4, key: 'Sinistres: 1, Polices: 28', route: '/director/assurances' },
-                    { name: 'Communication Digitale', status: '🟢', users: 3, key: 'Campagnes: 5, Stats: Real-time', route: '/director/communication' },
-                  ].map((service, idx) => (
-                    <tr key={idx} className="hover:bg-white/5 transition">
-                      <td className="px-6 py-4 text-white font-medium">{service.name}</td>
-                      <td className="px-6 py-4 text-green-400 font-semibold">{service.status} Actif</td>
-                      <td className="px-6 py-4 text-gray-400">{service.users} utilisateurs</td>
-                      <td className="px-6 py-4 text-gray-400 text-sm">{service.key}</td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => router.push(service.route)}
-                          className="text-blue-400 hover:text-blue-300 font-semibold text-sm"
-                        >
-                          Consulter →
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {activeUsers.map((account) => {
+                    const lastLog = logs.find((entry) => entry.user_id === account.id || entry.email === account.email);
+                    return (
+                      <tr key={account.id} className="text-sm text-slate-200">
+                        <td className="py-4">
+                          <p className="font-medium text-white">{account.prenom} {account.nom}</p>
+                          <p className="text-xs text-slate-400">{account.email}</p>
+                        </td>
+                        <td className="py-4 capitalize">{account.departement}</td>
+                        <td className="py-4 capitalize">{account.role}</td>
+                        <td className="py-4">
+                          <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300">Actif</span>
+                        </td>
+                        <td className="py-4 text-slate-400">
+                          {lastLog?.created_at ? new Date(lastLog.created_at).toLocaleString('fr-FR') : 'Aucune activité récente'}
+                        </td>
+                        <td className="py-4 text-right">
+                          <button
+                            onClick={() => handleHideUser(account.id)}
+                            className="rounded-full border border-amber-400/20 px-3 py-2 text-xs text-amber-200 transition hover:bg-amber-500/10"
+                          >
+                            Restreindre
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
 
-        {/* RACCOURCIS RAPIDES */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Logs & Audit */}
-          <div className="bg-white/5 border border-white/10 rounded-lg p-6 hover:border-white/20 transition cursor-pointer">
-            <h3 className="text-white font-semibold mb-4 flex items-center">
-              <Settings className="w-5 h-5 mr-2 text-blue-400" />
-              Logs & Audit
-            </h3>
-            <p className="text-gray-400 text-sm mb-4">Voir tous les accès, modifications, actions des utilisateurs</p>
-            <button className="text-blue-400 hover:text-blue-300 text-sm font-semibold">Consulter logs →</button>
-          </div>
+          <div className="space-y-6">
+            <section className="rounded-[28px] border border-white/10 bg-white/5 p-6">
+              <h2 className="text-xl font-semibold text-white">Activités récentes</h2>
+              <p className="mt-1 text-sm text-slate-400">Journaux de connexion et d’usage les plus récents.</p>
+              <div className="mt-5 space-y-3">
+                {recentActivity.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center text-sm text-slate-400">
+                    Aucun journal récent disponible.
+                  </p>
+                ) : (
+                  recentActivity.map((entry) => (
+                    <div key={entry.id} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-white">{entry.email}</p>
+                          <p className="mt-1 text-sm text-slate-400">
+                            {entry.departement || 'Département non précisé'} · {entry.success ? 'Connexion validée' : 'Échec d’accès'}
+                          </p>
+                        </div>
+                        <span className={`rounded-full px-2.5 py-1 text-xs ${entry.success ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/15 text-red-300'}`}>
+                          {entry.success ? 'OK' : 'Erreur'}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-xs text-slate-500">{new Date(entry.created_at).toLocaleString('fr-FR')}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
 
-          {/* Configuration */}
-          <div className="bg-white/5 border border-white/10 rounded-lg p-6 hover:border-white/20 transition cursor-pointer">
-            <h3 className="text-white font-semibold mb-4 flex items-center">
-              <Settings className="w-5 h-5 mr-2 text-purple-400" />
-              Configuration
-            </h3>
-            <p className="text-gray-400 text-sm mb-4">Gérer seuils de budget, permissions, paramètres globaux</p>
-            <button className="text-purple-400 hover:text-purple-300 text-sm font-semibold">Configurer →</button>
+            <section className="rounded-[28px] border border-white/10 bg-white/5 p-6">
+              <h2 className="text-xl font-semibold text-white">Répartition par service</h2>
+              <p className="mt-1 text-sm text-slate-400">Effectifs visibles et comptes effectivement actifs par périmètre.</p>
+              <div className="mt-5 space-y-3">
+                {departmentRows.map((department) => (
+                  <div key={department.key} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-white">{department.label}</p>
+                        <p className="text-sm text-slate-400">{department.active} actif(s) sur {department.count} compte(s)</p>
+                      </div>
+                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200">{department.count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
-        </div>
-      </div>
+        </section>
+
+        {restrictedUsers.length > 0 ? (
+          <section className="rounded-[28px] border border-amber-400/20 bg-amber-500/10 p-6">
+            <h2 className="text-xl font-semibold text-amber-100">Comptes actuellement restreints</h2>
+            <p className="mt-1 text-sm text-amber-100/80">
+              Une fois restreint, un compte reçoit un message de blocage à la connexion. Seul l’administrateur peut lever cette restriction.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {restrictedUsers.map((account) => (
+                <div key={account.id} className="rounded-2xl border border-amber-300/20 bg-black/10 p-4">
+                  <p className="font-medium text-white">{account.prenom} {account.nom}</p>
+                  <p className="text-sm text-amber-50/80">{account.email}</p>
+                  <p className="mt-2 text-xs uppercase tracking-[0.18em] text-amber-200">{account.departement}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </main>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+  icon,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div className="rounded-[28px] border border-white/10 bg-white/5 p-6" title={hint}>
+      <div className="mb-4 inline-flex rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-amber-300">{icon}</div>
+      <p className="text-sm text-slate-400">{label}</p>
+      <p className="mt-2 text-3xl font-semibold text-white">{value}</p>
+      <p className="mt-3 text-xs text-slate-500">{hint}</p>
     </div>
   );
 }

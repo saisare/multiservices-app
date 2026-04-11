@@ -4,10 +4,9 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  FileText, Search, Filter, Plus, Eye, Edit, Trash2,
-  ArrowLeft, Save, X, AlertCircle, CheckCircle,
-  Truck, Calendar, DollarSign, User, Package,
-  Printer, Download, Clock, Check, XCircle
+  Search, Plus, Eye, Edit, Trash2,
+  ArrowLeft, X, AlertCircle, CheckCircle,
+  Printer
 } from 'lucide-react';
 import { logistiqueApi, type Commande, type LigneCommande, type Produit } from '@/services/api/logistique.api';
 
@@ -57,9 +56,9 @@ export default function CommandesPage() {
     try {
       const data = await logistiqueApi.getCommandes();
       setCommandes(data);
-    } catch (err: any) { 
+    } catch (err: unknown) { 
       console.error('Error loading commandes:', err);
-      setError('Erreur chargement commandes: ' + (err.message || 'Vérifiez le backend logistique'));
+      setError('Erreur chargement commandes: ' + ((err as Error).message || 'Vérifiez le backend logistique'));
     } finally { setLoading(false); }
   };
 
@@ -72,9 +71,9 @@ export default function CommandesPage() {
         setFormData({ client_nom: data.client_nom || '', client_adresse: data.client_adresse || '', client_telephone: data.client_telephone || '', date_livraison_souhaitee: data.date_livraison_souhaitee || '', notes: data.notes || '' });
         setLignes(data.lignes || []);
       }
-    } catch (err: any) { 
+    } catch (err: unknown) { 
       console.error('Error loading commande:', err);
-      setError('Erreur chargement commande: ' + (err.message || 'Non trouvée'));
+      setError('Erreur chargement commande: ' + ((err as Error).message || 'Non trouvée'));
     } finally { setLoading(false); }
   };
 
@@ -105,29 +104,46 @@ export default function CommandesPage() {
     if (!formData.client_nom) { setError('Nom client requis'); return; }
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await logistiqueApi.createCommande({
+        client_nom: formData.client_nom,
+        client_adresse: formData.client_adresse,
+        client_telephone: formData.client_telephone,
+        date_livraison_souhaitee: formData.date_livraison_souhaitee,
+        lignes: lignesData.map((ligne) => ({
+          produit_id: parseInt(ligne.produit_id),
+          quantite: parseInt(ligne.quantite),
+          prix_unitaire: parseFloat(ligne.prix_unitaire)
+        }))
+      });
       setSuccess('Commande créée avec succès');
       setTimeout(() => { setMode('list'); loadCommandes(); }, 1500);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+    } catch (err: unknown) { setError((err as Error).message); } finally { setLoading(false); }
   };
 
   const handleUpdateStatut = async (newStatut: string) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
+      if (!commande) return;
+      await logistiqueApi.updateCommande(commande.id, { statut: newStatut as Commande['statut'] });
       setSuccess(`Statut mis à jour: ${newStatut}`);
-      if (commande) setCommande({ ...commande, statut: newStatut as any });
+      if (commande) setCommande({ ...commande, statut: newStatut as Commande['statut'] });
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err: any) { setError(err.message); }
+    } catch (err: unknown) { setError((err as Error).message); }
   };
 
   const handleUpdate = async () => {
     if (!commande) return;
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await logistiqueApi.updateCommande(commande.id, {
+        client_nom: formData.client_nom,
+        client_adresse: formData.client_adresse,
+        client_telephone: formData.client_telephone,
+        date_livraison_souhaitee: formData.date_livraison_souhaitee,
+        notes: formData.notes,
+      });
       setSuccess('Commande mise à jour avec succès');
       setTimeout(() => { setMode('detail'); }, 1500);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+    } catch (err: unknown) { setError((err as Error).message); } finally { setLoading(false); }
   };
 
   const filteredCommandes = commandes.filter(c => c.numero_commande.includes(searchTerm) || c.client_nom.toLowerCase().includes(searchTerm.toLowerCase())).filter(c => statusFilter === 'all' || c.statut === statusFilter);

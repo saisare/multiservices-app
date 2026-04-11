@@ -74,12 +74,13 @@ export default function CandidatsPage() {
       const found = data?.find(c => c.id === id);
       if (found) {
         setCandidate(found);
+        const candidate = found as any;
         setFormData({
-          nom: found.nom || '',
-          prenom: found.prenom || '',
-          email: found.email || '',
-          telephone: found.telephone || '',
-          nationalite: found.nationalite || '',
+          nom: candidate.nom || '',
+          prenom: candidate.prenom || '',
+          email: candidate.email || '',
+          telephone: candidate.telephone || '',
+          nationalite: candidate.nationalite || '',
           date_naissance: ''
         });
       } else {

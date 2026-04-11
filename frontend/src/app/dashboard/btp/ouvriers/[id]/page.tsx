@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { buildServiceBase } from '@/lib/runtime-api';
 import { Loader, AlertCircle, Edit, ArrowLeft, Trash2 } from 'lucide-react';
+
+const BTP_API_BASE = `${buildServiceBase(3003)}/api`;
 
 export default function OuvrierDetailPage() {
   const router = useRouter();
@@ -22,7 +25,7 @@ export default function OuvrierDetailPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3003/api/ouvriers/${id}`, {
+      const response = await fetch(`${BTP_API_BASE}/ouvriers/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -40,7 +43,7 @@ export default function OuvrierDetailPage() {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet ouvrier?')) return;
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3003/api/ouvriers/${id}`, {
+      const response = await fetch(`${BTP_API_BASE}/ouvriers/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -102,7 +105,7 @@ export default function OuvrierDetailPage() {
             <h1 className="text-3xl font-bold">
               {ouvrier.prenom} {ouvrier.nom}
             </h1>
-            <p className="text-orange-100 mt-1">{ouvrier.poste}</p>
+            <p className="text-orange-100 mt-1">{ouvrier.metier}</p>
           </div>
 
           <div className="p-8">
@@ -126,11 +129,11 @@ export default function OuvrierDetailPage() {
                 <div className="space-y-3">
                   <div>
                     <p className="text-sm text-gray-600">Poste</p>
-                    <p className="text-gray-900">{ouvrier.poste}</p>
+                    <p className="text-gray-900">{ouvrier.metier}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Salaire</p>
-                    <p className="text-gray-900">{ouvrier.salaire ? `${ouvrier.salaire} FCFA/jour` : 'N/A'}</p>
+                    <p className="text-gray-900">{ouvrier.salaire_journalier ? `${ouvrier.salaire_journalier} FCFA/jour` : 'N/A'}</p>
                   </div>
                 </div>
               </div>

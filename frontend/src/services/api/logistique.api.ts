@@ -87,6 +87,23 @@ export interface Stats {
   valeur_stock: number;
 }
 
+export interface Livraison {
+  id: number;
+  commande_id: number;
+  commande_numero: string;
+  client_nom: string;
+  client_adresse?: string;
+  numero_suivi?: string;
+  transporteur: string;
+  date_expedition?: string;
+  date_livraison_prevue?: string;
+  date_livraison_reelle?: string | null;
+  statut: 'PREPARATION' | 'EXPEDIE' | 'EN_TRANSIT' | 'LIVRE' | 'RETARD';
+  adresse_livraison?: string;
+  frais_port: number;
+  created_at?: string;
+}
+
 export const logistiqueApi = {
   getProduits: async (): Promise<Produit[]> => {
     try {
@@ -153,6 +170,54 @@ export const logistiqueApi = {
   }) => {
     return request<{ numero_commande: string; message: string }>('/commandes', {
       method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateCommande: async (id: number, data: Partial<Commande>) => {
+    return request<{ message: string }>(`/commandes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getLivraisons: async (): Promise<Livraison[]> => {
+    try {
+      return await request<Livraison[]>('/livraisons');
+    } catch (error) {
+      console.error('Error fetching livraisons:', error);
+      return [];
+    }
+  },
+
+  getLivraison: async (id: number): Promise<Livraison | null> => {
+    try {
+      return await request<Livraison>(`/livraisons/${id}`);
+    } catch (error) {
+      console.error('Error fetching livraison:', error);
+      return null;
+    }
+  },
+
+  createLivraison: async (data: {
+    commande_id: number;
+    transporteur: string;
+    numero_suivi?: string;
+    date_expedition?: string;
+    date_livraison_prevue?: string;
+    adresse_livraison?: string;
+    frais_port?: number;
+    statut?: string;
+  }) => {
+    return request<{ id: number; message: string }>('/livraisons', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateLivraison: async (id: number, data: Partial<Livraison>) => {
+    return request<{ message: string }>(`/livraisons/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   },

@@ -18,7 +18,7 @@ const db = mysql.createConnection({
     port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || undefined,
-    database: process.env.DB_NAME || 'auth_db',
+    database: process.env.DB_NAME || 'communication_db',
     charset: 'utf8mb4'
 });
 
@@ -127,6 +127,29 @@ app.post('/api/campagnes', verifyToken, (req, res) => {
                 code,
                 message: 'Campagne crÃ©Ã©e avec succÃ¨s'
             });
+        }
+    );
+});
+
+app.put('/api/campagnes/:id', verifyToken, (req, res) => {
+    const { annonceur_id, nom_campagne, type_campagne, objectif, budget, date_debut, date_fin, statut } = req.body;
+
+    const sql = `UPDATE campagnes
+                 SET annonceur_id = COALESCE(?, annonceur_id),
+                     nom_campagne = COALESCE(?, nom_campagne),
+                     type_campagne = COALESCE(?, type_campagne),
+                     objectif = COALESCE(?, objectif),
+                     budget = COALESCE(?, budget),
+                     date_debut = COALESCE(?, date_debut),
+                     date_fin = COALESCE(?, date_fin),
+                     statut = COALESCE(?, statut)
+                 WHERE id = ?`;
+
+    db.query(sql, [annonceur_id || null, nom_campagne || null, type_campagne || null, objectif || null, budget || null, date_debut || null, date_fin || null, statut || null, req.params.id],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!result.affectedRows) return res.status(404).json({ error: 'Campagne non trouvée' });
+            res.json({ success: true, message: 'Campagne mise à jour' });
         }
     );
 });

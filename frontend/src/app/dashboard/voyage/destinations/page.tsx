@@ -9,6 +9,7 @@ import {
   MapPin, Plane, Hotel, Calendar, DollarSign,
   TrendingUp, Sun, Snowflake
 } from 'lucide-react';
+import { voyageApi } from '@/services/api/voyage.api';
 
 interface Destination {
   id: number;
@@ -72,39 +73,53 @@ export default function DestinationsPage() {
   const loadDestinations = async () => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setDestinations([
-        { id: 1, code_destination: 'DEST-001', pays: 'France', ville: 'Paris', aeroport_code: 'CDG', description: 'La ville lumière', saison_haute: 'Juin-Août', visa_requis: false, prix_moyen: 1200, date_creation: '2026-01-10' },
-        { id: 2, code_destination: 'DEST-002', pays: 'Allemagne', ville: 'Berlin', aeroport_code: 'BER', description: 'Capitale allemande', saison_haute: 'Mai-Sept', visa_requis: true, prix_moyen: 950, date_creation: '2026-01-15' },
-        { id: 3, code_destination: 'DEST-003', pays: 'Canada', ville: 'Montréal', aeroport_code: 'YUL', description: 'Ville francophone', saison_haute: 'Juin-Sept', visa_requis: true, prix_moyen: 1500, date_creation: '2026-02-01' },
-      ]);
+      const destinationsData = await voyageApi.getDestinations();
+      setDestinations((destinationsData as any[]).map((destination) => ({
+        ...destination,
+        code_destination: destination.code_destination || `DEST-${String(destination.id).padStart(4, '0')}`,
+        description: destination.description || '',
+        saison_haute: destination.saison_haute || '',
+        visa_requis: Boolean(destination.visa_requis),
+        prix_moyen: Number(destination.prix_moyen || 0),
+        date_creation: destination.date_creation || new Date().toISOString()
+      })));
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
   const loadDestination = async (id: number) => {
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const mockDest: Destination = { id, code_destination: 'DEST-001', pays: 'France', ville: 'Paris', aeroport_code: 'CDG', description: 'La ville lumière', saison_haute: 'Juin-Août', visa_requis: false, prix_moyen: 1200, date_creation: '2026-01-10' };
-      setDestination(mockDest);
+      const [destinationsData, volsData, hotelsData] = await Promise.all([
+        voyageApi.getDestinations(),
+        voyageApi.getVols(),
+        voyageApi.getHotels()
+      ]);
+      const selectedDestination = (destinationsData as any[]).find((item) => item.id === id);
+      if (!selectedDestination) {
+        throw new Error('Destination introuvable');
+      }
+      const normalized = {
+        ...selectedDestination,
+        code_destination: selectedDestination.code_destination || `DEST-${String(selectedDestination.id).padStart(4, '0')}`,
+        description: selectedDestination.description || '',
+        saison_haute: selectedDestination.saison_haute || '',
+        visa_requis: Boolean(selectedDestination.visa_requis),
+        prix_moyen: Number(selectedDestination.prix_moyen || 0),
+        date_creation: selectedDestination.date_creation || new Date().toISOString()
+      };
+      setDestination(normalized as Destination);
       setFormData({
-        code_destination: mockDest.code_destination,
-        pays: mockDest.pays,
-        ville: mockDest.ville,
-        aeroport_code: mockDest.aeroport_code,
-        description: mockDest.description,
-        saison_haute: mockDest.saison_haute,
-        visa_requis: mockDest.visa_requis,
-        prix_moyen: mockDest.prix_moyen.toString()
+        code_destination: normalized.code_destination,
+        pays: normalized.pays,
+        ville: normalized.ville,
+        aeroport_code: normalized.aeroport_code || '',
+        description: normalized.description,
+        saison_haute: normalized.saison_haute,
+        visa_requis: normalized.visa_requis,
+        prix_moyen: String(normalized.prix_moyen)
       });
-      setVols([
-        { id: 1, code_vol: 'AF1234', compagnie: 'Air France', prix: 450 },
-        { id: 2, code_vol: 'LH5678', compagnie: 'Lufthansa', prix: 420 },
-      ]);
-      setHotels([
-        { id: 1, nom: 'Hilton Paris', etoiles: 5, prix_nuit: 250 },
-        { id: 2, nom: 'Ibis Paris', etoiles: 3, prix_nuit: 80 },
-      ]);
+      setVols((volsData as Vol[]).filter((item: any) => item.destination_id === id));
+      setHotels((hotelsData as Hotel[]).filter((item: any) => item.destination_id === id));
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
@@ -112,8 +127,37 @@ export default function DestinationsPage() {
     if (!formData.pays || !formData.ville) { setError('Pays et ville requis'); return; }
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await voyageApi.createDestination({
+        pays: formData.pays,
+        ville: formData.ville,
+        aeroport_code: formData.aeroport_code,
+        description: formData.description,
+        saison_haute: formData.saison_haute,
+        visa_requis: formData.visa_requis,
+        prix_moyen: Number(formData.prix_moyen || 0)
+      });
       setSuccess('Destination créée');
+      setTimeout(() => { setMode('list'); loadDestinations(); }, 1500);
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+  };
+
+  const handleUpdate = async () => {
+    if (!formData.pays || !formData.ville) { setError('Pays et ville requis'); return; }
+    setLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setSuccess('Destination mis à jour');
+      setMode('detail');
+      setTimeout(() => { loadDestinations(); }, 1500);
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Êtes-vous sûr?')) return;
+    setLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      setSuccess('Destination supprimée');
       setTimeout(() => { setMode('list'); loadDestinations(); }, 1500);
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };

@@ -2,7 +2,17 @@
 
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, BarChart3, Building2, CheckCircle2, EyeOff, PieChart, Users } from 'lucide-react';
-import { getUsers, hideUser } from '@/services/api/admin.api';
+import {
+  getAnnouncements,
+  getDocumentTransfers,
+  getInternalMessages,
+  getMonitoringOverview,
+  getUsers,
+  hideUser,
+  type Announcement,
+  type DocumentTransfer,
+  type InternalMessage,
+} from '@/services/api/admin.api';
 
 type User = {
   id: number;
@@ -17,15 +27,29 @@ type User = {
 
 export default function PDGDashboard() {
   const [users, setUsers] = useState<User[]>([]);
+  const [overview, setOverview] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [messages, setMessages] = useState<InternalMessage[]>([]);
+  const [documentTransfers, setDocumentTransfers] = useState<DocumentTransfer[]>([]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await getUsers();
+      const [data, monitoring, announcementRows, messageRows, transferRows] = await Promise.all([
+        getUsers(),
+        getMonitoringOverview(),
+        getAnnouncements('pdg'),
+        getInternalMessages(),
+        getDocumentTransfers(),
+      ]);
       setUsers(data);
+      setOverview(monitoring);
+      setAnnouncements(announcementRows);
+      setMessages(messageRows);
+      setDocumentTransfers(transferRows);
       setError('');
     } catch (err: unknown) {
       setError((err as Error).message || 'Erreur fetch users');
@@ -80,8 +104,8 @@ export default function PDGDashboard() {
               <Building2 className="h-4 w-4" />
               Direction générale
             </div>
-            <h1 className="mt-3 text-3xl font-bold text-slate-900">Tableau de bord PDG</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">Vue globale du système, des utilisateurs et des départements. Le PDG reste en lecture avec droit de masquage des comptes.</p>
+            <h1 className="mt-3 text-3xl font-bold text-slate-900">Pilotage exécutif</h1>
+            <p className="mt-2 max-w-3xl text-sm text-slate-600">Vision consolidée des effectifs, de l’activation des comptes et du niveau de couverture opérationnelle.</p>
           </div>
         </div>
       </section>
@@ -90,10 +114,10 @@ export default function PDGDashboard() {
       {success && <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"><CheckCircle2 className="mr-2 inline h-5 w-5" />{success}</div>}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={<Users className="h-5 w-5 text-indigo-600" />} label="Utilisateurs" value={String(stats.totalUsers)} accent="indigo" />
-        <StatCard icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />} label="Actifs" value={String(stats.activeUsers)} accent="emerald" />
-        <StatCard icon={<Building2 className="h-5 w-5 text-sky-600" />} label="Départements" value={String(stats.activeServices)} accent="sky" />
-        <StatCard icon={<EyeOff className="h-5 w-5 text-amber-600" />} label="Comptes masqués" value={String(stats.hiddenUsers)} accent="amber" />
+        <StatCard icon={<Users className="h-5 w-5 text-indigo-600" />} label="Effectif total" value={String(stats.totalUsers)} accent="indigo" hint="Nombre total de comptes enregistrés." />
+        <StatCard icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />} label="Comptes actifs" value={String(stats.activeUsers)} accent="emerald" hint="Comptes autorisés à se connecter." />
+        <StatCard icon={<Building2 className="h-5 w-5 text-sky-600" />} label="Départements couverts" value={String(stats.activeServices)} accent="sky" hint="Départements disposant d'utilisateurs visibles." />
+        <StatCard icon={<EyeOff className="h-5 w-5 text-amber-600" />} label="Comptes masqués" value={String(stats.hiddenUsers)} accent="amber" hint="Comptes retirés de l'affichage standard." />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
@@ -131,20 +155,17 @@ export default function PDGDashboard() {
             Lecture direction
           </h2>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <InfoTile label="Taux d'activité" value={`${stats.totalUsers ? Math.round((stats.activeUsers / stats.totalUsers) * 100) : 0}%`} />
-            <InfoTile label="Taux de masquage" value={`${stats.totalUsers ? Math.round((stats.hiddenUsers / stats.totalUsers) * 100) : 0}%`} />
-            <InfoTile label="Population visible" value={String(stats.totalUsers - stats.hiddenUsers)} />
-            <InfoTile label="Population active" value={String(stats.activeUsers)} />
-          </div>
-          <div className="mt-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-800">
-            Le PDG dispose d'une vue consolidée. Les opérations sensibles restent restreintes pour garder une gouvernance propre du logiciel.
+            <InfoTile label="Taux d'activation" value={`${stats.totalUsers ? Math.round((stats.activeUsers / stats.totalUsers) * 100) : 0}%`} />
+            <InfoTile label="Notifications non lues" value={String(overview.unread_notifications || 0)} />
+            <InfoTile label="Sessions ouvertes" value={String(overview.total_sessions || 0)} />
+            <InfoTile label="Comptes en attente" value={String(overview.pending_users || 0)} />
           </div>
         </div>
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-slate-900">Utilisateurs</h2>
-        <p className="mt-1 text-sm text-slate-500">Lecture consolidée du service auth. Le masquage reste possible côté direction.</p>
+        <h2 className="text-xl font-semibold text-slate-900">Supervision des comptes</h2>
+        <p className="mt-1 text-sm text-slate-500">Lecture consolidée des accès avec action de masquage si nécessaire.</p>
 
         {loading ? (
           <div className="flex justify-center py-16"><div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" /></div>
@@ -184,11 +205,17 @@ export default function PDGDashboard() {
           </div>
         )}
       </section>
+
+      <section className="grid gap-6 xl:grid-cols-3">
+        <FeedPanel title="Annonces consolidées" items={announcements.map((item) => ({ id: item.id, title: item.title, subtitle: item.target_department, body: item.message }))} />
+        <FeedPanel title="Messages reçus" items={messages.map((item) => ({ id: item.id, title: item.subject, subtitle: item.target_department || 'direct', body: item.message }))} />
+        <FeedPanel title="Documents transférés" items={documentTransfers.map((item) => ({ id: item.id, title: item.title, subtitle: item.recipient_department, body: item.notes || item.document_type }))} />
+      </section>
     </div>
   );
 }
 
-function StatCard({ icon, label, value, accent }: { icon: ReactNode; label: string; value: string; accent: 'indigo' | 'emerald' | 'sky' | 'amber' }) {
+function StatCard({ icon, label, value, accent, hint }: { icon: ReactNode; label: string; value: string; accent: 'indigo' | 'emerald' | 'sky' | 'amber'; hint?: string }) {
   const palette = {
     indigo: 'border-indigo-200 bg-indigo-50',
     emerald: 'border-emerald-200 bg-emerald-50',
@@ -202,7 +229,7 @@ function StatCard({ icon, label, value, accent }: { icon: ReactNode; label: stri
         <div className="rounded-2xl bg-white p-3 shadow-sm">{icon}</div>
         <span className="text-3xl font-bold text-slate-900">{value}</span>
       </div>
-      <p className="mt-4 text-sm font-medium text-slate-600">{label}</p>
+      <p className="mt-4 text-sm font-medium text-slate-600" title={hint}>{label}</p>
     </div>
   );
 }
@@ -212,6 +239,33 @@ function InfoTile({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <p className="text-sm text-slate-500">{label}</p>
       <p className="mt-1 text-2xl font-bold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function FeedPanel({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ id: number; title: string; subtitle: string; body: string }>;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+      <div className="mt-4 space-y-3">
+        {items.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-500">Aucun élément disponible.</p>
+        ) : (
+          items.slice(0, 5).map((item) => (
+            <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="font-semibold text-slate-900">{item.title}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">{item.subtitle}</p>
+              <p className="mt-2 text-sm text-slate-600">{item.body}</p>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

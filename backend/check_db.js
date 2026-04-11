@@ -45,18 +45,20 @@ db.connect((err) => {
                 });
               }
               
-              // Vérifier pending_users
-              db.query("SELECT COUNT(*) as count FROM auth_db.pending_users", (err, cnt) => {
+              // Vérifier les comptes en attente dans users (actif = 0)
+              db.query("SELECT COUNT(*) as count FROM auth_db.users WHERE actif = 0", (err, cnt) => {
                 if (!err) {
-                  console.log('\n⏳ COMPTES EN ATTENTE:', cnt[0].count);
-                  db.query("SELECT id, email, nom, prenom, departement, status FROM auth_db.pending_users", (err, pending) => {
+                  console.log('\n⏳ COMPTES EN ATTENTE (users.actif = 0):', cnt[0].count);
+                  db.query("SELECT id, email, nom, prenom, departement, actif FROM auth_db.users WHERE actif = 0", (err, pending) => {
                     if (!err && pending.length > 0) {
                       pending.forEach(p => {
-                        console.log(`  ${p.id}. ${p.email} (${p.departement}) - Status: ${p.status}`);
+                        console.log(`  ${p.id}. ${p.email} (${p.departement}) - Actif: ${p.actif}`);
                       });
                     }
                     db.end();
                   });
+                } else {
+                  db.end();
                 }
               });
             });

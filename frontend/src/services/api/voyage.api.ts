@@ -43,14 +43,24 @@ const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
 
 export interface VoyageClient {
   id: number;
+  code_client?: string;
   nom: string;
   prenom: string;
+  email?: string;
+  telephone?: string;
+  nationalite?: string;
 }
 
 export interface Destination {
   id: number;
+  code_destination?: string;
   pays: string;
   ville: string;
+  aeroport_code?: string;
+  description?: string;
+  saison_haute?: string;
+  visa_requis?: boolean;
+  prix_moyen?: number;
 }
 
 export interface Offre {
@@ -70,7 +80,8 @@ export const voyageApi = {
   // Voyage
   getVoyageClients: async (): Promise<VoyageClient[]> => {
     try {
-      return await request<VoyageClient[]>('/voyage/clients');
+      const data = await request<{ clients?: VoyageClient[] }>('/voyage/clients');
+      return data?.clients || [];
     } catch (error) {
       console.error('Error fetching voyage clients:', error);
       return [];
@@ -79,7 +90,8 @@ export const voyageApi = {
 
   getDestinations: async (): Promise<Destination[]> => {
     try {
-      return await request<Destination[]>('/voyage/destinations');
+      const data = await request<{ destinations?: Destination[] }>('/voyage/destinations');
+      return data?.destinations || [];
     } catch (error) {
       console.error('Error fetching destinations:', error);
       return [];
@@ -88,7 +100,8 @@ export const voyageApi = {
 
   getOffres: async (): Promise<Offre[]> => {
     try {
-      return await request<Offre[]>('/voyage/offres');
+      const data = await request<{ offres?: Offre[] }>('/voyage/offres');
+      return data?.offres || [];
     } catch (error) {
       console.error('Error fetching offres:', error);
       return [];
@@ -98,7 +111,8 @@ export const voyageApi = {
   // Immigration
   getImmigrationCandidates: async (): Promise<ImmigrationCandidate[]> => {
     try {
-      return await request<ImmigrationCandidate[]>('/voyage/immigration/candidates');
+      const data = await request<{ demandeurs?: ImmigrationCandidate[] }>('/voyage/immigration/demandeurs');
+      return data?.demandeurs || [];
     } catch (error) {
       console.error('Error fetching immigration candidates:', error);
       return [];
@@ -107,7 +121,8 @@ export const voyageApi = {
 
   getDossiers: async (): Promise<any[]> => {
     try {
-      return await request<any[]>('/voyage/immigration/dossiers');
+      const data = await request<{ dossiers?: any[] }>('/voyage/immigration/dossiers');
+      return data?.dossiers || [];
     } catch (error) {
       console.error('Error fetching dossiers:', error);
       return [];
@@ -116,7 +131,8 @@ export const voyageApi = {
 
   getRendezVous: async (): Promise<any[]> => {
     try {
-      return await request<any[]>('/voyage/immigration/rendez-vous');
+      const data = await request<{ rendezVous?: any[] }>('/voyage/immigration/rendez-vous');
+      return data?.rendezVous || [];
     } catch (error) {
       console.error('Error fetching rendez-vous:', error);
       return [];
@@ -129,6 +145,50 @@ export const voyageApi = {
     } catch (error) {
       console.error('Error fetching stats:', error);
       return {};
+    }
+  },
+
+  createVoyageClient: async (data: Record<string, unknown>) => {
+    return request<Record<string, unknown>>('/voyage/clients', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  createDestination: async (data: Record<string, unknown>) => {
+    return request<Record<string, unknown>>('/voyage/destinations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getReservations: async (): Promise<any[]> => {
+    try {
+      const data = await request<{ reservations?: any[] }>('/voyage/reservations');
+      return data?.reservations || [];
+    } catch (error) {
+      console.error('Error fetching reservations:', error);
+      return [];
+    }
+  },
+
+  getVols: async (): Promise<any[]> => {
+    try {
+      const data = await request<{ vols?: any[] }>('/voyage/vols');
+      return data?.vols || [];
+    } catch (error) {
+      console.error('Error fetching vols:', error);
+      return [];
+    }
+  },
+
+  getHotels: async (): Promise<any[]> => {
+    try {
+      const data = await request<{ hotels?: any[] }>('/voyage/hotels');
+      return data?.hotels || [];
+    } catch (error) {
+      console.error('Error fetching hotels:', error);
+      return [];
     }
   },
 };

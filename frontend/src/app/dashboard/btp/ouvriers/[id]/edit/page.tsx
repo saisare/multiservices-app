@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { buildServiceBase } from '@/lib/runtime-api';
 import { Loader, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
+
+const BTP_API_BASE = `${buildServiceBase(3003)}/api`;
 
 export default function EditOuvrierPage() {
   const router = useRouter();
@@ -19,8 +22,8 @@ export default function EditOuvrierPage() {
     prenom: '',
     telephone: '',
     email: '',
-    poste: '',
-    salaire: ''
+    metier: '',
+    salaire_journalier: ''
   });
 
   useEffect(() => {
@@ -32,7 +35,7 @@ export default function EditOuvrierPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3003/api/ouvriers/${id}`, {
+      const response = await fetch(`${BTP_API_BASE}/ouvriers/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -44,8 +47,8 @@ export default function EditOuvrierPage() {
         prenom: data.prenom || '',
         telephone: data.telephone || '',
         email: data.email || '',
-        poste: data.poste || '',
-        salaire: data.salaire || ''
+        metier: data.metier || '',
+        salaire_journalier: data.salaire_journalier || ''
       });
     } catch (err) {
       setError((err as any).message);
@@ -59,8 +62,8 @@ export default function EditOuvrierPage() {
     try {
       setError('');
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3003/api/ouvriers/${id}`, {
-        method: 'PATCH',
+      const response = await fetch(`${BTP_API_BASE}/ouvriers/${id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -158,8 +161,8 @@ export default function EditOuvrierPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Poste</label>
                 <input
                   type="text"
-                  value={formData.poste}
-                  onChange={(e) => setFormData({ ...formData, poste: e.target.value })}
+                  value={formData.metier}
+                  onChange={(e) => setFormData({ ...formData, metier: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>
@@ -168,8 +171,8 @@ export default function EditOuvrierPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Salaire</label>
                 <input
                   type="number"
-                  value={formData.salaire}
-                  onChange={(e) => setFormData({ ...formData, salaire: e.target.value })}
+                  value={formData.salaire_journalier}
+                  onChange={(e) => setFormData({ ...formData, salaire_journalier: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 />
               </div>

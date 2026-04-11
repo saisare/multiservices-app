@@ -1,286 +1,177 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  Megaphone, Users, TrendingUp, DollarSign, Eye,
-  MousePointer, Share2, BarChart3, Plus, Calendar,
-  Clock, CheckCircle, AlertCircle, Download,
-  Facebook, Instagram, Linkedin, Twitter, Youtube
-} from 'lucide-react';
+import { BarChart3, Eye, Megaphone, MousePointer, Plus, Users } from 'lucide-react';
+import { communicationApi, type Campagne, type PerformanceCommunication } from '@/services/api/communication.api';
 
-interface DashboardStats {
+type DashboardStats = {
   totalAnnonceurs: number;
   totalCampagnes: number;
   campagnesActives: number;
+  budgetTotal: number;
+  benefices: number;
   impressionsTotales: number;
   clicsTotaux: number;
   conversionsTotales: number;
   revenuTotal: number;
-  roiMoyen: number;
-}
-
-interface CampagneRecente {
-  id: number;
-  nom: string;
-  annonceur: string;
-  type: string;
-  date_debut: string;
-  budget: number;
-  statut: string;
-  performance: number;
-}
-
-interface PerformanceParPlateforme {
-  plateforme: string;
-  impressions: number;
-  clics: number;
-  conversions: number;
-  revenu: number;
-}
+};
 
 export default function CommunicationDashboard() {
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
-    totalAnnonceurs: 24,
-    totalCampagnes: 48,
-    campagnesActives: 12,
-    impressionsTotales: 1250000,
-    clicsTotaux: 45000,
-    conversionsTotales: 3200,
-    revenuTotal: 156000,
-    roiMoyen: 285
+    totalAnnonceurs: 0,
+    totalCampagnes: 0,
+    campagnesActives: 0,
+    budgetTotal: 0,
+    benefices: 0,
+    impressionsTotales: 0,
+    clicsTotaux: 0,
+    conversionsTotales: 0,
+    revenuTotal: 0,
   });
+  const [campagnes, setCampagnes] = useState<Campagne[]>([]);
+  const [performances, setPerformances] = useState<PerformanceCommunication[]>([]);
 
-  const [campagnesRecentes, setCampagnesRecentes] = useState<CampagneRecente[]>([
-    { id: 1, nom: 'Lancement App', annonceur: 'Tech Solutions', type: 'Facebook Ads', date_debut: '2026-03-01', budget: 5000, statut: 'ACTIVE', performance: 78 },
-    { id: 2, nom: 'Soldes Été', annonceur: 'Mode Express', type: 'Google Ads', date_debut: '2026-03-10', budget: 3000, statut: 'ACTIVE', performance: 92 },
-    { id: 3, nom: 'Promo Rentrée', annonceur: 'Auto Plus', type: 'Emailing', date_debut: '2026-02-15', budget: 1500, statut: 'TERMINEE', performance: 65 },
-  ]);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [statsData, campagnesData] = await Promise.all([
+          communicationApi.getStats(),
+          communicationApi.getCampagnes(),
+        ]);
 
-  const [performancesParPlateforme, setPerformancesParPlateforme] = useState<PerformanceParPlateforme[]>([
-    { plateforme: 'Facebook', impressions: 450000, clics: 18000, conversions: 1200, revenu: 62000 },
-    { plateforme: 'Instagram', impressions: 380000, clics: 15000, conversions: 980, revenu: 48000 },
-    { plateforme: 'Google', impressions: 320000, clics: 9000, conversions: 720, revenu: 36000 },
-    { plateforme: 'LinkedIn', impressions: 100000, clics: 3000, conversions: 300, revenu: 10000 },
-  ]);
+        const performanceRows = (
+          await Promise.all(campagnesData.slice(0, 5).map((campagne) => communicationApi.getPerformances(campagne.id)))
+        ).flat();
 
-  const getPlateformeIcon = (plateforme: string) => {
-    switch (plateforme.toLowerCase()) {
-      case 'facebook': return <Facebook className="w-5 h-5 text-blue-600" />;
-      case 'instagram': return <Instagram className="w-5 h-5 text-pink-600" />;
-      case 'linkedin': return <Linkedin className="w-5 h-5 text-blue-800" />;
-      case 'twitter': return <Twitter className="w-5 h-5 text-blue-400" />;
-      case 'youtube': return <Youtube className="w-5 h-5 text-red-600" />;
-      default: return <Megaphone className="w-5 h-5 text-gray-600" />;
-    }
-  };
+        setCampagnes(campagnesData);
+        setPerformances(performanceRows);
+        setStats({
+          totalAnnonceurs: Number(statsData.annonceurs || 0),
+          totalCampagnes: Number(statsData.campagnes || 0),
+          campagnesActives: Number(statsData.campagnes_en_cours || 0),
+          budgetTotal: Number(statsData.budget_total || 0),
+          benefices: Number(statsData.benefices || 0),
+          impressionsTotales: performanceRows.reduce((sum, row) => sum + Number(row.impressions || 0), 0),
+          clicsTotaux: performanceRows.reduce((sum, row) => sum + Number(row.clics || 0), 0),
+          conversionsTotales: performanceRows.reduce((sum, row) => sum + Number(row.conversions || 0), 0),
+          revenuTotal: performanceRows.reduce((sum, row) => sum + Number(row.revenu || 0), 0),
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  const recentCampaigns = useMemo(() => campagnes.slice(0, 5), [campagnes]);
+  const ctr = stats.impressionsTotales ? ((stats.clicsTotaux / stats.impressionsTotales) * 100).toFixed(1) : '0.0';
+  const conversionRate = stats.clicsTotaux ? ((stats.conversionsTotales / stats.clicsTotaux) * 100).toFixed(1) : '0.0';
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-14 w-14 animate-spin rounded-full border-4 border-cyan-200 border-t-slate-900" />
+          <p className="text-slate-600">Chargement du tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      <section className="rounded-[28px] border border-slate-800 bg-[linear-gradient(135deg,#04111f_0%,#0b1d36_45%,#0a3144_100%)] px-6 py-8 text-white shadow-xl">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-cyan-200/80">Pilotage communication</p>
+            <h1 className="mt-2 text-3xl font-semibold">Tableau de bord</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-300">
+              Vision consolidée des campagnes, des annonceurs et des performances digitales reliées à la base communication.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Link href="/dashboard/communication/annonceurs" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm transition hover:bg-white/10">
+              Portefeuille annonceurs
+            </Link>
+            <Link href="/dashboard/communication/campagnes?action=new" className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm transition hover:bg-cyan-400/20">
+              Nouvelle campagne
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Annonceurs actifs" value={String(stats.totalAnnonceurs)} icon={<Users className="h-5 w-5" />} />
+        <MetricCard label="Campagnes actives" value={String(stats.campagnesActives)} icon={<Megaphone className="h-5 w-5" />} />
+        <MetricCard label="CTR moyen" value={`${ctr}%`} icon={<MousePointer className="h-5 w-5" />} />
+        <MetricCard label="Revenu suivi" value={`${stats.revenuTotal.toLocaleString('fr-FR')} FCFA`} icon={<Eye className="h-5 w-5" />} />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.1fr,0.9fr]">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Campagnes récentes</h2>
+              <p className="mt-1 text-sm text-slate-500">Campagnes servies par le microservice communication.</p>
+            </div>
+            <Link href="/dashboard/communication/campagnes" className="text-sm font-medium text-cyan-700">Voir tout</Link>
+          </div>
+          <div className="space-y-3">
+            {recentCampaigns.map((campaign) => (
+              <div key={campaign.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-900">{campaign.nom_campagne}</p>
+                    <p className="text-sm text-slate-600">{campaign.nom_entreprise}</p>
+                  </div>
+                  <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-medium text-cyan-800">{campaign.statut}</span>
+                </div>
+                <p className="mt-3 text-sm text-slate-500">
+                  Budget: {Number(campaign.budget || 0).toLocaleString('fr-FR')} FCFA
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-cyan-700" />
+            <h2 className="text-xl font-semibold text-slate-900">Lecture performance</h2>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <InfoTile label="Budget total" value={`${stats.budgetTotal.toLocaleString('fr-FR')} FCFA`} />
+            <InfoTile label="Bénéfices estimés" value={`${stats.benefices.toLocaleString('fr-FR')} FCFA`} />
+            <InfoTile label="Conversions" value={String(stats.conversionsTotales)} />
+            <InfoTile label="Taux de conversion" value={`${conversionRate}%`} />
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MetricCard({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Communication Digitale</h1>
-          <p className="text-gray-600 mt-2">Gestion des campagnes et performances marketing</p>
-        </div>
-        <Link href="/dashboard/communication/campagnes?action=new" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
-          <Plus className="w-4 h-4 mr-2" />
-          Nouvelle campagne
-        </Link>
+        <div className="rounded-2xl bg-cyan-50 p-3 text-cyan-700">{icon}</div>
+        <span className="text-2xl font-semibold text-slate-900">{value}</span>
       </div>
+      <p className="mt-4 text-sm text-slate-600">{label}</p>
+    </div>
+  );
+}
 
-      {/* Statistiques principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <Megaphone className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">{stats.totalCampagnes}</span>
-          </div>
-          <p className="mt-2 text-sm opacity-90">Campagnes totales</p>
-          <p className="text-xs mt-1">{stats.campagnesActives} actives</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <Eye className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">{(stats.impressionsTotales / 1000).toFixed(0)}K</span>
-          </div>
-          <p className="mt-2 text-sm opacity-90">Impressions</p>
-          <p className="text-xs mt-1">+18% vs mois dernier</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <MousePointer className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">{(stats.clicsTotaux / 1000).toFixed(0)}K</span>
-          </div>
-          <p className="mt-2 text-sm opacity-90">Clics</p>
-          <p className="text-xs mt-1">CTR: {(stats.clicsTotaux / stats.impressionsTotales * 100).toFixed(1)}%</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <DollarSign className="w-8 h-8 opacity-80" />
-            <span className="text-2xl font-bold">{stats.revenuTotal.toLocaleString()} €</span>
-          </div>
-          <p className="mt-2 text-sm opacity-90">Revenu total</p>
-          <p className="text-xs mt-1">ROI: {stats.roiMoyen}%</p>
-        </div>
-      </div>
-
-      {/* Deuxième ligne */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="w-8 h-8 text-green-500" />
-            <div>
-              <p className="text-sm text-gray-600">Taux de conversion</p>
-              <p className="text-2xl font-bold">{(stats.conversionsTotales / stats.clicsTotaux * 100).toFixed(1)}%</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <Share2 className="w-8 h-8 text-blue-500" />
-            <div>
-              <p className="text-sm text-gray-600">Engagement</p>
-              <p className="text-2xl font-bold">{(stats.clicsTotaux / stats.impressionsTotales * 100).toFixed(1)}%</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <Users className="w-8 h-8 text-purple-500" />
-            <div>
-              <p className="text-sm text-gray-600">Annonceurs</p>
-              <p className="text-2xl font-bold">{stats.totalAnnonceurs}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <DollarSign className="w-8 h-8 text-orange-500" />
-            <div>
-              <p className="text-sm text-gray-600">Coût par clic</p>
-              <p className="text-2xl font-bold">{(stats.revenuTotal / stats.clicsTotaux).toFixed(2)} €</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Campagnes récentes */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center">
-            <Calendar className="w-5 h-5 mr-2 text-blue-500" />
-            Campagnes récentes
-          </h2>
-          <Link href="/dashboard/communication/campagnes" className="text-sm text-blue-600 hover:underline">
-            Voir tout
-          </Link>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Annonceur</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Budget</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Performance</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {campagnesRecentes.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 font-medium">{c.nom}</td>
-                  <td className="px-6 py-4">{c.annonceur}</td>
-                  <td className="px-6 py-4">{c.type}</td>
-                  <td className="px-6 py-4">{c.budget.toLocaleString()} €</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 bg-gray-200 rounded-full h-2">
-                        <div className="bg-green-500 h-2 rounded-full" style={{ width: `${c.performance}%` }} />
-                      </div>
-                      <span className="text-sm">{c.performance}%</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs ${c.statut === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                      {c.statut}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Link href={`/dashboard/communication/campagnes?id=${c.id}`} className="text-blue-600 hover:text-blue-800">
-                      <Eye className="w-4 h-4" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Performances par plateforme */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center">
-          <BarChart3 className="w-5 h-5 mr-2 text-purple-500" />
-          Performances par plateforme
-        </h2>
-        <div className="space-y-4">
-          {performancesParPlateforme.map(p => (
-            <div key={p.plateforme} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-3">
-                {getPlateformeIcon(p.plateforme)}
-                <div>
-                  <p className="font-medium">{p.plateforme}</p>
-                  <p className="text-sm text-gray-500">{(p.impressions / 1000).toFixed(0)}K impressions</p>
-                </div>
-              </div>
-              <div className="flex gap-6">
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Clics</p>
-                  <p className="font-medium">{p.clics.toLocaleString()}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Conversions</p>
-                  <p className="font-medium">{p.conversions}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Revenu</p>
-                  <p className="font-medium">{p.revenu.toLocaleString()} €</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Actions rapides */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
-        <h3 className="text-xl font-semibold mb-4">Actions rapides</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link href="/dashboard/communication/annonceurs?action=new" className="flex flex-col items-center p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-all">
-            <Users className="w-6 h-6 mb-2" />
-            <span className="text-sm text-center">Nouvel annonceur</span>
-          </Link>
-          <Link href="/dashboard/communication/campagnes?action=new" className="flex flex-col items-center p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-all">
-            <Megaphone className="w-6 h-6 mb-2" />
-            <span className="text-sm text-center">Nouvelle campagne</span>
-          </Link>
-          <Link href="/dashboard/communication/performances" className="flex flex-col items-center p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-all">
-            <BarChart3 className="w-6 h-6 mb-2" />
-            <span className="text-sm text-center">Rapports</span>
-          </Link>
-          <Link href="#" className="flex flex-col items-center p-4 bg-white/10 hover:bg-white/20 rounded-lg transition-all">
-            <Download className="w-6 h-6 mb-2" />
-            <span className="text-sm text-center">Exporter données</span>
-          </Link>
-        </div>
-      </div>
+function InfoTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-slate-900">{value}</p>
     </div>
   );
 }

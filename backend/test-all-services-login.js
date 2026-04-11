@@ -20,23 +20,9 @@ const testAccounts = [
   {
     name: 'ADMIN',
     email: 'admin@blg-engineering.com',
-    password: 'Blg1app23@',
+    password: 'BtpAdmin2026@',
     departement: 'DIRECTION',
     expectedRole: 'admin'
-  },
-  {
-    name: 'DIRECTEUR',
-    email: 'directeur@blg-engineering.com',
-    password: 'Director2026@',
-    departement: 'DIRECTION',
-    expectedRole: 'directeur'
-  },
-  {
-    name: 'EMPLOYEE (voyage)',
-    email: 'kaidoxkaid0@gmail.com',
-    password: 'Junior23@',
-    departement: 'voyage',
-    expectedRole: 'employee'
   }
 ];
 

@@ -84,6 +84,33 @@ export interface Sinistre {
   montant_estime: number;
 }
 
+export interface ContratAssurance {
+  id: number;
+  numero_contrat: string;
+  assure_id: number;
+  assure_nom?: string;
+  assure_prenom?: string;
+  type_assurance: string;
+  date_effet: string;
+  date_echeance?: string;
+  montant?: number;
+  statut?: string;
+}
+
+export interface ReglementAssurance {
+  id: number;
+  sinistre_id: number;
+  numero_sinistre?: string;
+  numero_police?: string;
+  assure_nom?: string;
+  assure_prenom?: string;
+  montant: number;
+  date_reglement: string;
+  mode_reglement: string;
+  reference?: string;
+  beneficiaire?: string;
+}
+
 export const assuranceApi = {
   getAssures: async (): Promise<Assure[]> => {
     try {
@@ -143,6 +170,47 @@ export const assuranceApi = {
     } catch (error) {
       console.error('Error fetching experts:', error);
       return [];
+    }
+  },
+
+  getContratsAssurance: async (): Promise<ContratAssurance[]> => {
+    try {
+      return await request<ContratAssurance[]>('/contrats-assurance');
+    } catch (error) {
+      console.error('Error fetching contrats assurance:', error);
+      return [];
+    }
+  },
+
+  createContratAssurance: async (data: Record<string, unknown>) => {
+    return request<{ id: number; numero_contrat: string; message: string }>('/contrats-assurance', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getReglements: async (): Promise<ReglementAssurance[]> => {
+    try {
+      return await request<ReglementAssurance[]>('/reglements');
+    } catch (error) {
+      console.error('Error fetching reglements:', error);
+      return [];
+    }
+  },
+
+  createReglement: async (data: Record<string, unknown>) => {
+    return request<{ id: number; message: string }>('/reglements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getStats: async (): Promise<Record<string, unknown>> => {
+    try {
+      return await request<Record<string, unknown>>('/stats');
+    } catch (error) {
+      console.error('Error fetching assurance stats:', error);
+      return {};
     }
   },
 };

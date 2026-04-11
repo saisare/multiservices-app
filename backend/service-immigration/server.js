@@ -343,17 +343,19 @@ app.put('/api/rendez-vous/:id', verifyToken, (req, res) => {
 // ROUTES DEMANDES D'ASSISTANCE (TABLE: demandes_assistance)
 // ===========================================
 
-// GET toutes les demandes d'assistance d'un utilisateur
+// GET toutes les demandes d'assistance
 app.get('/api/demandes-assistance', verifyToken, (req, res) => {
-    const user_id = req.user.id;
-
     db.query(`
-        SELECT d.*, dem.nom as demandeur_nom, dem.prenom as demandeur_prenom
+        SELECT
+            d.*,
+            ds.numero_dossier,
+            dem.nom as demandeur_nom,
+            dem.prenom as demandeur_prenom
         FROM demandes_assistance d
-        LEFT JOIN demandeurs dem ON d.demandeur_id = dem.id
-        WHERE d.utilisateur_id = ?
+        LEFT JOIN dossiers ds ON d.dossier_id = ds.id
+        LEFT JOIN demandeurs dem ON ds.demandeur_id = dem.id
         ORDER BY d.date_creation DESC
-    `, [user_id], (err, results) => {
+    `, (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
@@ -362,9 +364,14 @@ app.get('/api/demandes-assistance', verifyToken, (req, res) => {
 // GET une demande d'assistance spécifique
 app.get('/api/demandes-assistance/:id', verifyToken, (req, res) => {
     db.query(`
-        SELECT d.*, dem.nom as demandeur_nom, dem.prenom as demandeur_prenom
+        SELECT
+            d.*,
+            ds.numero_dossier,
+            dem.nom as demandeur_nom,
+            dem.prenom as demandeur_prenom
         FROM demandes_assistance d
-        LEFT JOIN demandeurs dem ON d.demandeur_id = dem.id
+        LEFT JOIN dossiers ds ON d.dossier_id = ds.id
+        LEFT JOIN demandeurs dem ON ds.demandeur_id = dem.id
         WHERE d.id = ?
     `, [req.params.id], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -373,92 +380,71 @@ app.get('/api/demandes-assistance/:id', verifyToken, (req, res) => {
     });
 });
 
-// POST créer une demande d'assistance (MESSAGE)
+// POST créer une demande d'assistance
 app.post('/api/demandes-assistance', verifyToken, (req, res) => {
-    const { demandeur_id, type, titre, message } = req.body;
-    const user_id = req.user.id;
+    const { dossier_id, type_assistance, description } = req.body;
 
-    if (!type || !titre || !message) {
-        return res.status(400).json({ error: 'Champs obligatoires: type, titre, message' });
+    if (!dossier_id || !type_assistance || !description) {
+        return res.status(400).json({ error: 'Champs obligatoires: dossier_id, type_assistance, description' });
     }
 
-    const numero_demande = `ASS-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
-
     const sql = `INSERT INTO demandes_assistance
-                 (numero_demande, demandeur_id, utilisateur_id, type, titre, message, statut, date_creation)
-                 VALUES (?, ?, ?, ?, ?, ?, 'OUVERTE', NOW())`;
+                 (dossier_id, type_assistance, description, statut, date_creation)
+                 VALUES (?, ?, ?, 'PENDING', NOW())`;
 
-    db.query(sql, [numero_demande, demandeur_id || null, user_id, type, titre, message],
+    db.query(sql, [dossier_id, type_assistance, description],
         (err, result) => {
             if (err) return res.status(500).json({ error: err.message });
             res.status(201).json({
                 id: result.insertId,
-                numero_demande,
                 message: 'Demande d\'assistance créée avec succès'
             });
         }
     );
 });
 
-// PUT mettre à jour une demande (RÉPONSE/COMMENTAIRE)
+// PUT mettre à jour une demande
 app.put('/api/demandes-assistance/:id', verifyToken, (req, res) => {
-    const { reponse, statut } = req.body;
-    const user_id = req.user.id;
+    const { description, statut } = req.body;
+    const fields = [];
+    const values = [];
 
-    if (!reponse) {
-        return res.status(400).json({ error: 'Réponse requise' });
+    if (description !== undefined) {
+        fields.push('description = ?');
+        values.push(description);
     }
 
-    // Vérifier que c'est l'auteur ou un admin
-    db.query('SELECT utilisateur_id FROM demandes_assistance WHERE id = ?', [req.params.id], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(404).json({ error: 'Demande non trouvée' });
+    if (statut !== undefined) {
+        fields.push('statut = ?');
+        values.push(statut);
+    }
 
-        // Permettre à l'auteur ou aux admins de répondre
-        const is_author = results[0].utilisateur_id === user_id;
-        const is_admin = req.user.role === 'admin';
+    if (fields.length === 0) {
+        return res.status(400).json({ error: 'Aucune modification fournie' });
+    }
 
-        if (!is_author && !is_admin) {
-            return res.status(403).json({ error: 'Permission denied' });
+    values.push(req.params.id);
+
+    db.query(
+        `UPDATE demandes_assistance SET ${fields.join(', ')} WHERE id = ?`,
+        values,
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (result.affectedRows === 0) return res.status(404).json({ error: 'Demande non trouvée' });
+            res.json({ success: true, message: 'Demande mise à jour avec succès' });
         }
-
-        const sql = `UPDATE demandes_assistance
-                     SET reponse = ?, statut = COALESCE(?, statut), date_statut = NOW()
-                     WHERE id = ?`;
-
-        db.query(sql, [reponse, statut || null, req.params.id],
-            (err, result) => {
-                if (err) return res.status(500).json({ error: err.message });
-                if (result.affectedRows === 0) return res.status(404).json({ error: 'Demande non trouvée' });
-                res.json({ success: true, message: 'Demande mise à jour avec succès' });
-            }
-        );
-    });
+    );
 });
 
 // DELETE une demande (soft delete)
 app.delete('/api/demandes-assistance/:id', verifyToken, (req, res) => {
-    const user_id = req.user.id;
-
-    // Vérifier ownership
-    db.query('SELECT utilisateur_id FROM demandes_assistance WHERE id = ?', [req.params.id], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (results.length === 0) return res.status(404).json({ error: 'Demande non trouvée' });
-
-        const is_author = results[0].utilisateur_id === user_id;
-        const is_admin = req.user.role === 'admin';
-
-        if (!is_author && !is_admin) {
-            return res.status(403).json({ error: 'Permission denied' });
+    db.query('UPDATE demandes_assistance SET statut = "RESOLVED" WHERE id = ?', [req.params.id],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (result.affectedRows === 0) return res.status(404).json({ error: 'Demande non trouvée' });
+            res.json({ success: true, message: 'Demande clôturée' });
         }
-
-        db.query('UPDATE demandes_assistance SET statut = "FERMEE" WHERE id = ?', [req.params.id],
-            (err, result) => {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({ success: true, message: 'Demande fermée' });
-            }
-        );
-    });
+    );
 });
 
 // ===========================================

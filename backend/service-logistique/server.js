@@ -18,7 +18,7 @@ const db = mysql.createConnection({
     port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || undefined,
-    database: process.env.DB_NAME || 'auth_db',
+    database: process.env.DB_NAME || 'logistique_db',
     charset: 'utf8mb4'
 });
 
@@ -385,7 +385,8 @@ app.get('/api/commandes', verifyToken, (req, res) => {
 // GET /api/commandes/:id - DÃ©tail d'une commande
 app.get('/api/commandes/:id', verifyToken, (req, res) => {
     const sql1 = 'SELECT * FROM commandes WHERE id = ?';
-    const sql2 = `SELECT lc.*, p.nom as produit_nom 
+    const sql2 = `SELECT lc.*, p.nom as produit_nom, p.code_produit as produit_code,
+                         (lc.quantite * lc.prix_unitaire) as total_ligne
                   FROM lignes_commande lc
                   JOIN produits p ON lc.produit_id = p.id
                   WHERE lc.commande_id = ?`;
@@ -403,6 +404,141 @@ app.get('/api/commandes/:id', verifyToken, (req, res) => {
             });
         });
     });
+});
+
+app.put('/api/commandes/:id', verifyToken, (req, res) => {
+    const { client_nom, client_adresse, client_telephone, date_livraison_souhaitee, notes, statut } = req.body;
+
+    const sql = `UPDATE commandes
+                 SET client_nom = COALESCE(?, client_nom),
+                     client_adresse = COALESCE(?, client_adresse),
+                     client_telephone = COALESCE(?, client_telephone),
+                     date_livraison_souhaitee = COALESCE(?, date_livraison_souhaitee),
+                     notes = COALESCE(?, notes),
+                     statut = COALESCE(?, statut)
+                 WHERE id = ?`;
+
+    db.query(
+        sql,
+        [client_nom || null, client_adresse || null, client_telephone || null, date_livraison_souhaitee || null, notes || null, statut || null, req.params.id],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: 'Commande non trouvée' });
+            }
+            res.json({ message: 'Commande mise à jour avec succès' });
+        }
+    );
+});
+
+// ===========================================
+// ROUTES LIVRAISONS
+// ===========================================
+
+app.get('/api/livraisons', verifyToken, (req, res) => {
+    const sql = `SELECT l.*, c.numero_commande AS commande_numero, c.client_nom, c.client_adresse
+                 FROM livraisons l
+                 JOIN commandes c ON c.id = l.commande_id
+                 ORDER BY l.created_at DESC`;
+
+    db.query(sql, (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results || []);
+    });
+});
+
+app.get('/api/livraisons/:id', verifyToken, (req, res) => {
+    const sql = `SELECT l.*, c.numero_commande AS commande_numero, c.client_nom, c.client_adresse
+                 FROM livraisons l
+                 JOIN commandes c ON c.id = l.commande_id
+                 WHERE l.id = ?`;
+
+    db.query(sql, [req.params.id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!results || results.length === 0) {
+            return res.status(404).json({ error: 'Livraison non trouvée' });
+        }
+        res.json(results[0]);
+    });
+});
+
+app.post('/api/livraisons', verifyToken, (req, res) => {
+    const {
+        commande_id,
+        transporteur,
+        numero_suivi,
+        date_expedition,
+        date_livraison_prevue,
+        adresse_livraison,
+        frais_port,
+        statut
+    } = req.body;
+
+    if (!commande_id || !transporteur) {
+        return res.status(400).json({ error: 'Commande et transporteur requis' });
+    }
+
+    const sql = `INSERT INTO livraisons
+                 (commande_id, numero_suivi, transporteur, date_expedition, date_livraison_prevue, statut, adresse_livraison, frais_port, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+
+    db.query(
+        sql,
+        [
+            commande_id,
+            numero_suivi || null,
+            transporteur,
+            date_expedition || null,
+            date_livraison_prevue || null,
+            statut || 'PREPARATION',
+            adresse_livraison || null,
+            frais_port || 0
+        ],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.status(201).json({ id: result.insertId, message: 'Livraison créée avec succès' });
+        }
+    );
+});
+
+app.put('/api/livraisons/:id', verifyToken, (req, res) => {
+    const {
+        transporteur,
+        numero_suivi,
+        date_expedition,
+        date_livraison_prevue,
+        date_livraison_reelle,
+        adresse_livraison,
+        frais_port,
+        statut
+    } = req.body;
+
+    const sql = `UPDATE livraisons
+                 SET transporteur = ?, numero_suivi = ?, date_expedition = ?, date_livraison_prevue = ?,
+                     date_livraison_reelle = ?, adresse_livraison = ?, frais_port = ?, statut = ?
+                 WHERE id = ?`;
+
+    db.query(
+        sql,
+        [
+            transporteur || null,
+            numero_suivi || null,
+            date_expedition || null,
+            date_livraison_prevue || null,
+            date_livraison_reelle || null,
+            adresse_livraison || null,
+            frais_port || 0,
+            statut || 'PREPARATION',
+            req.params.id
+        ],
+        (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: 'Livraison non trouvée' });
+            }
+            res.json({ message: 'Livraison mise à jour avec succès' });
+        }
+    );
 });
 
 // ===========================================

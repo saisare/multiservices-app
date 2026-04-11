@@ -1,271 +1,258 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Bell, Check, X, Clock } from 'lucide-react';
-
-interface Notification {
-  id: number;
-  type: string;
-  title: string;
-  message: string;
-  data?: any;
-  created_at: string;
-  is_read: number;
-}
-
-interface PendingUser {
-  id: number;
-  email: string;
-  nom: string;
-  prenom: string;
-  telephone?: string;
-  poste?: string;
-  departement: string;
-  requested_at: string;
-  notification_id?: number;
-  has_notification: boolean;
-}
+import { useEffect, useState } from 'react';
+import { Bell, Check, Clock, Send, X } from 'lucide-react';
+import {
+  approvePendingUser,
+  getDepartments,
+  getNotifications,
+  getPendingUsers,
+  markNotificationRead,
+  rejectPendingUser,
+  sendDepartmentNotification,
+  type Department,
+  type Notification,
+  type PendingUser,
+} from '@/services/api/admin.api';
 
 export default function AdminNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [token, setToken] = useState('');
+  const [success, setSuccess] = useState('');
+  const [form, setForm] = useState({
+    department: 'all',
+    title: '',
+    message: '',
+  });
 
   useEffect(() => {
-    // Get token from localStorage
-    const savedToken = localStorage.getItem('token');
-    if (savedToken) {
-      setToken(savedToken);
-      loadNotifications(savedToken);
-      loadPendingUsers(savedToken);
-    }
+    loadAll();
   }, []);
 
-  const loadNotifications = async (authToken: string) => {
+  const loadAll = async () => {
     try {
-      const res = await fetch('http://localhost:3002/api/auth/notifications', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.notifications || []);
-      }
-    } catch (err: any) {
-      console.error('Error loading notifications:', err);
-    }
-  };
-
-  const loadPendingUsers = async (authToken: string) => {
-    try {
-      const res = await fetch('http://localhost:3002/api/auth/pending-users-with-notifications', {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setPendingUsers(data.users || []);
-      }
-    } catch (err: any) {
-      console.error('Error loading pending users:', err);
+      setLoading(true);
+      const [notificationRows, pendingRows, departmentRows] = await Promise.all([
+        getNotifications(),
+        getPendingUsers(),
+        getDepartments(),
+      ]);
+      setNotifications(notificationRows);
+      setPendingUsers(pendingRows);
+      setDepartments(departmentRows);
+      setError('');
+    } catch (loadError) {
+      setError((loadError as Error).message || 'Impossible de charger les notifications.');
     } finally {
       setLoading(false);
     }
   };
 
-  const markAsRead = async (notifId: number) => {
-    try {
-      await fetch(`http://localhost:3002/api/auth/notifications/${notifId}/read`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      setNotifications(notifications.map(n =>
-        n.id === notifId ? { ...n, is_read: 1 } : n
-      ));
-    } catch (err: any) {
-      console.error('Error marking as read:', err);
-    }
-  };
-
   const approveUser = async (userId: number) => {
     try {
-      const res = await fetch(`http://localhost:3002/api/auth/users/${userId}/approve`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-      });
-
-      if (res.ok) {
-        setPendingUsers(pendingUsers.filter(u => u.id !== userId));
-        setError('');
-      } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to approve user');
-      }
-    } catch (err: any) {
-      setError(err.message);
+      await approvePendingUser(userId);
+      setPendingUsers((current) => current.filter((user) => user.id !== userId));
+      setSuccess('Compte approuvé.');
+    } catch (approveError) {
+      setError((approveError as Error).message);
     }
   };
 
   const rejectUser = async (userId: number) => {
     try {
-      const res = await fetch(`http://localhost:3002/api/auth/users/${userId}/reject`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ reason: 'Rejected by admin' })
-      });
-
-      if (res.ok) {
-        setPendingUsers(pendingUsers.filter(u => u.id !== userId));
-        setError('');
-      } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to reject user');
-      }
-    } catch (err: any) {
-      setError(err.message);
+      await rejectPendingUser(userId, 'Rejet administratif');
+      setPendingUsers((current) => current.filter((user) => user.id !== userId));
+      setSuccess('Demande rejetée.');
+    } catch (rejectError) {
+      setError((rejectError as Error).message);
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('fr-FR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const handleMarkRead = async (notificationId: number) => {
+    try {
+      await markNotificationRead(notificationId);
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === notificationId ? { ...notification, is_read: 1 } : notification
+        )
+      );
+    } catch (markError) {
+      setError((markError as Error).message);
+    }
+  };
+
+  const handleSend = async () => {
+    try {
+      setSubmitting(true);
+      setError('');
+      setSuccess('');
+      const response = await sendDepartmentNotification(form);
+      setForm({ department: 'all', title: '', message: '' });
+      setSuccess(`Notification envoyée à ${response.delivered} destinataire(s).`);
+      await loadAll();
+    } catch (sendError) {
+      setError((sendError as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <Bell className="w-6 h-6 text-blue-600" />
+      <div className="flex items-center gap-3">
+        <div className="rounded-2xl bg-blue-100 p-3 text-blue-700">
+          <Bell className="h-6 w-6" />
+        </div>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-gray-600">Demandes de création de comptes en attente</p>
+          <h1 className="text-3xl font-bold text-gray-900">Notifications et diffusion</h1>
+          <p className="text-gray-600">Gérez les validations et envoyez des messages par département.</p>
         </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="bg-red-100 border border-red-300 rounded-lg p-4 text-red-700">
-          {error}
-        </div>
-      )}
+      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {success ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</div> : null}
 
-      {/* Pending Users */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-orange-600" />
-          <h2 className="text-xl font-bold text-gray-900">
-            Demandes en attente ({pendingUsers.length})
-          </h2>
+      <section className="grid gap-6 xl:grid-cols-[1.15fr,0.85fr]">
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <Clock className="h-5 w-5 text-orange-600" />
+            <h2 className="text-xl font-semibold text-gray-900">Demandes en attente ({pendingUsers.length})</h2>
+          </div>
+
+          {loading ? (
+            <p className="py-8 text-center text-gray-500">Chargement des demandes...</p>
+          ) : pendingUsers.length === 0 ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center text-emerald-700">
+              Aucune demande en attente.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pendingUsers.map((user) => (
+                <article key={user.id} className="rounded-3xl border border-gray-200 p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{user.prenom} {user.nom}</h3>
+                      <p className="text-sm text-gray-600">{user.email}</p>
+                      <div className="mt-3 grid gap-2 text-sm text-gray-600 md:grid-cols-2">
+                        <p><span className="font-medium text-gray-800">Département:</span> {user.departement}</p>
+                        <p><span className="font-medium text-gray-800">Poste:</span> {user.poste || 'Non renseigné'}</p>
+                        <p><span className="font-medium text-gray-800">Téléphone:</span> {user.telephone || 'Non renseigné'}</p>
+                        <p><span className="font-medium text-gray-800">Créé le:</span> {new Date(user.requested_at).toLocaleString('fr-FR')}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => approveUser(user.id)}
+                        className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm text-white transition hover:bg-emerald-700"
+                      >
+                        <Check className="h-4 w-4" />
+                        Approuver
+                      </button>
+                      <button
+                        onClick={() => rejectUser(user.id)}
+                        className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm text-white transition hover:bg-red-700"
+                      >
+                        <X className="h-4 w-4" />
+                        Rejeter
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="text-gray-600">Chargement...</div>
-          </div>
-        ) : pendingUsers.length === 0 ? (
-          <div className="bg-green-50 border border-green-300 rounded-lg p-6 text-center">
-            <p className="text-green-700">✅ Aucune demande en attente</p>
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {pendingUsers.map((user) => (
-              <div
-                key={user.id}
-                className="bg-white border border-gray-300 rounded-lg p-6 shadow-sm hover:shadow-md transition"
+        <div className="space-y-6">
+          <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900">Envoyer une notification</h2>
+            <p className="mt-1 text-sm text-gray-600">Diffusez un message ciblé à un département ou à tout le personnel visible.</p>
+
+            <div className="mt-5 space-y-4">
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-gray-700">Département destinataire</span>
+                <select
+                  value={form.department}
+                  onChange={(event) => setForm((current) => ({ ...current, department: event.target.value }))}
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-gray-400"
+                >
+                  <option value="all">Tous les départements visibles</option>
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.code}>{department.nom}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-gray-700">Titre</span>
+                <input
+                  value={form.title}
+                  onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-gray-400"
+                  placeholder="Ex: Mise à jour d'exploitation"
+                />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-gray-700">Message</span>
+                <textarea
+                  rows={5}
+                  value={form.message}
+                  onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
+                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 outline-none focus:border-gray-400"
+                  placeholder="Rédigez ici le message à transmettre."
+                />
+              </label>
+
+              <button
+                onClick={handleSend}
+                disabled={submitting}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-50"
               >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {user.prenom} {user.nom}
-                    </h3>
-                    <p className="text-sm text-gray-600">{user.email}</p>
-                  </div>
-                  {user.has_notification && (
-                    <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                      📨 Notifié
-                    </span>
-                  )}
-                </div>
+                <Send className="h-4 w-4" />
+                Envoyer la notification
+              </button>
+            </div>
+          </section>
 
-                {/* Details */}
-                <div className="grid grid-cols-2 gap-4 mb-4 py-4 border-y">
-                  <div>
-                    <p className="text-xs text-gray-600">Département</p>
-                    <p className="text-sm font-medium text-gray-900">{user.departement}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Poste</p>
-                    <p className="text-sm font-medium text-gray-900">{user.poste || 'Non spécifié'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Téléphone</p>
-                    <p className="text-sm font-medium text-gray-900">{user.telephone || 'Non fourni'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Demandé le</p>
-                    <p className="text-sm font-medium text-gray-900">{formatDate(user.requested_at)}</p>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => approveUser(user.id)}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition"
-                  >
-                    <Check className="w-4 h-4" />
-                    Approuver
-                  </button>
-                  <button
-                    onClick={() => rejectUser(user.id)}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition"
-                  >
-                    <X className="w-4 h-4" />
-                    Rejeter
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Stats */}
-      {!loading && (
-        <div className="grid grid-cols-3 gap-4 mt-8">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-xs text-blue-600 font-semibold">NOTIFI_CATIONS NOUVELLES</p>
-            <p className="text-2xl font-bold text-blue-700">
-              {notifications.filter(n => !n.is_read).length}
-            </p>
-          </div>
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <p className="text-xs text-orange-600 font-semibold">EN ATTENTE</p>
-            <p className="text-2xl font-bold text-orange-700">{pendingUsers.length}</p>
-          </div>
-          <div className="bg-gray-50 border border-gray-300 rounded-lg p-4">
-            <p className="text-xs text-gray-600 font-semibold">TOTAL NOTIF</p>
-            <p className="text-2xl font-bold text-gray-700">{notifications.length}</p>
-          </div>
+          <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900">Fil de notifications ({notifications.length})</h2>
+            <div className="mt-5 space-y-3">
+              {notifications.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500">
+                  Aucune notification disponible.
+                </p>
+              ) : (
+                notifications.slice(0, 8).map((notification) => (
+                  <article key={notification.id} className="rounded-2xl border border-gray-200 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium text-gray-900">{notification.title}</p>
+                        <p className="mt-1 text-sm text-gray-600">{notification.message}</p>
+                        <p className="mt-2 text-xs text-gray-400">{new Date(notification.created_at).toLocaleString('fr-FR')}</p>
+                      </div>
+                      {!notification.is_read ? (
+                        <button
+                          onClick={() => handleMarkRead(notification.id)}
+                          className="rounded-full border border-blue-200 px-3 py-2 text-xs text-blue-700 transition hover:bg-blue-50"
+                        >
+                          Marquer lu
+                        </button>
+                      ) : (
+                        <span className="rounded-full bg-gray-100 px-3 py-2 text-xs text-gray-500">Lu</span>
+                      )}
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         </div>
-      )}
+      </section>
     </div>
   );
 }

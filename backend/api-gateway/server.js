@@ -39,7 +39,13 @@ const authMiddleware = (req, res, next) => {
   // Le gateway n'a qu'un rÃ´le de proxy - la vraie validation se fait dans chaque service
   // avec son propre JWT_SECRET
   try {
-    jwt.verify(token, process.env.JWT_SECRET || 'gateway_secret_key_2026_microservice');
+    const gatewaySecret = process.env.JWT_SECRET || 'jwt_secret_microservices_blg_engineering_2026';
+    const fallbackSecret = 'gateway_secret_key_2026_microservice';
+    try {
+      jwt.verify(token, gatewaySecret);
+    } catch (firstErr) {
+      jwt.verify(token, fallbackSecret);
+    }
     next();
   } catch (err) {
     res.status(401).json({ error: 'Token invalide au gateway' });

@@ -157,9 +157,9 @@ function verify4_UserStats() {
   db.query(
     `SELECT
       COUNT(*) as total_users,
-      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_users,
-      SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_users,
-      SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_users,
+      SUM(CASE WHEN actif = 0 THEN 1 ELSE 0 END) as pending_users,
+      SUM(CASE WHEN actif = 1 THEN 1 ELSE 0 END) as active_users,
+      SUM(CASE WHEN hidden = 1 THEN 1 ELSE 0 END) as hidden_users,
       SUM(CASE WHEN password_hash LIKE '$2%' THEN 1 ELSE 0 END) as bcrypt_hashed,
       SUM(CASE WHEN password_hash NOT LIKE '$2%' AND LENGTH(password_hash) < 100 THEN 1 ELSE 0 END) as plaintext_passwords
      FROM users`,
@@ -175,15 +175,14 @@ function verify4_UserStats() {
       console.log(`   Total users: ${stats.total_users}`);
       console.log(`   Pending: ${stats.pending_users}`);
       console.log(`   Active: ${stats.active_users}`);
-      console.log(`   Rejected: ${stats.rejected_users}`);
+      console.log(`   Hidden: ${stats.hidden_users}`);
       console.log(`\n✅ Password Statistics:\n`);
       console.log(`   Bcrypt hashed: ${stats.bcrypt_hashed}`);
       console.log(`   Plaintext: ${stats.plaintext_passwords}`);
 
       if (stats.plaintext_passwords > 0) {
         console.log('\n⚠️  WARNING: Found plaintext passwords!');
-        console.log('   These are pending users waiting for approval.');
-        console.log('   After approval, passwords will be hashed.\n');
+        console.log('   These users should be migrated to bcrypt immediately.\n');
       } else {
         console.log('\n✅ No plaintext passwords found\n');
       }
@@ -198,7 +197,7 @@ function verify5_SampleUsers() {
   console.log('-'.repeat(70));
 
   db.query(
-    `SELECT id, email, role, status, DATE(date_creation) as created
+    `SELECT id, email, role, actif, DATE(date_creation) as created
      FROM users
      ORDER BY date_creation DESC
      LIMIT 5`,
@@ -214,8 +213,9 @@ function verify5_SampleUsers() {
       } else {
         console.log(`\n✅ Recent users:\n`);
         results.forEach(user => {
-          const statusEmoji = user.status === 'active' ? '✅' : '⏳';
-          console.log(`   ${statusEmoji} ${user.email.padEnd(30)} ${user.status.padEnd(10)} ${user.role}`);
+          const statusLabel = user.actif ? 'active' : 'pending';
+          const statusEmoji = user.actif ? '✅' : '⏳';
+          console.log(`   ${statusEmoji} ${user.email.padEnd(30)} ${statusLabel.padEnd(10)} ${user.role}`);
         });
         console.log();
       }
@@ -332,7 +332,7 @@ function verify10_Recommendations() {
   db.query(
     `SELECT
       COUNT(*) as total,
-      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+      SUM(CASE WHEN actif = 0 THEN 1 ELSE 0 END) as pending
      FROM users`,
     (err, results) => {
       const stats = results?.[0] || { total: 0, pending: 0 };

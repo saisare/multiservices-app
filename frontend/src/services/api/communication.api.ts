@@ -66,6 +66,17 @@ export interface Campagne {
   statut: string;
 }
 
+export interface PerformanceCommunication {
+  id: number;
+  campagne_id: number;
+  date_mesure: string;
+  impressions: number;
+  clics: number;
+  conversions: number;
+  cout: number;
+  revenu: number;
+}
+
 export const communicationApi = {
   getAnnonceurs: async (): Promise<Annonceur[]> => {
     try {
@@ -110,18 +121,39 @@ export const communicationApi = {
     }
   },
 
-  getPerformances: async (campagneId: number): Promise<any[]> => {
+  createCampagne: async (data: Omit<Campagne, 'id' | 'code_campagne' | 'nom_entreprise'>) => {
+    return request<{ id: number; code: string; message: string }>('/campagnes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateCampagne: async (id: number, data: Partial<Campagne>) => {
+    return request<{ success: boolean; message: string }>(`/campagnes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getPerformances: async (campagneId: number): Promise<PerformanceCommunication[]> => {
     try {
-      return await request<any[]>(`/performances/campagne/${campagneId}`);
+      return await request<PerformanceCommunication[]>(`/performances/campagne/${campagneId}`);
     } catch (error) {
       console.error('Error fetching performances:', error);
       return [];
     }
   },
 
-  getStats: async (): Promise<Record<string, any>> => {
+  createPerformance: async (data: Omit<PerformanceCommunication, 'id'>) => {
+    return request<{ id: number; message: string }>('/performances', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getStats: async (): Promise<Record<string, number>> => {
     try {
-      return await request<Record<string, any>>('/stats');
+      return await request<Record<string, number>>('/stats');
     } catch (error) {
       console.error('Error fetching stats:', error);
       return {};

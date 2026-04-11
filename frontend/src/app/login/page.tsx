@@ -41,6 +41,42 @@ interface LoginResponse {
   ownerName?: string;
 }
 
+const normalizeDepartmentRoute = (value: string) => {
+  const normalized = (value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+  const aliases: Record<string, string> = {
+    pdg: 'pdg',
+    direction: 'pdg',
+    'direction generale': 'pdg',
+    'pdg direction generale': 'pdg',
+    secretaire: 'secretaire',
+    secretariat: 'secretaire',
+    assurance: 'assurance',
+    'service assurance': 'assurance',
+    btp: 'btp',
+    construction: 'btp',
+    'btp construction': 'btp',
+    rh: 'rh',
+    'ressources humaines': 'rh',
+    voyage: 'voyage',
+    immigration: 'voyage',
+    'service voyage immigration': 'voyage',
+    'service voyage et immigration': 'voyage',
+    'service voyage': 'voyage',
+    logistique: 'logistique',
+    communication: 'communication',
+    'communication digitale': 'communication'
+  };
+
+  return aliases[normalized] || normalized || 'dashboard';
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,6 +88,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [language, setLanguage] = useState('fr');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,6 +117,7 @@ export default function LoginPage() {
   // États pour partage de compte
   const [shareEmail, setShareEmail] = useState('');
   const [sharePassword, setSharePassword] = useState('');
+  const [showSharePassword, setShowSharePassword] = useState(false);
   const [shareReason, setShareReason] = useState('');
   const [shareDuration, setShareDuration] = useState('15'); // minutes
 
@@ -260,7 +299,8 @@ export default function LoginPage() {
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      localStorage.setItem('departement', data.user.departement || selectedDepartment);
+      const userDepartmentRoute = normalizeDepartmentRoute(data.user.departement || selectedDepartment);
+      localStorage.setItem('departement', userDepartmentRoute);
 
       // Store token in cookie for middleware
       document.cookie = `auth_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
@@ -290,8 +330,8 @@ export default function LoginPage() {
         console.log('➡️ Redirecting to /dashboard/secretaire');
         router.push('/dashboard/secretaire');
       } else {
-        console.log('➡️ Redirecting to /dashboard/' + data.user.departement);
-        router.push(`/dashboard/${data.user.departement}`);
+        console.log('➡️ Redirecting to /dashboard/' + userDepartmentRoute);
+        router.push(`/dashboard/${userDepartmentRoute}`);
       }
     } catch (err: any) {
       console.error('❌ Login error:', err.message);
@@ -324,10 +364,9 @@ export default function LoginPage() {
       return;
     }
 
-    // Validation du mot de passe - plus permissif
-    const passwordStrength = getPasswordStrength(newUser.password);
-    if (passwordStrength.score < 40) {
-      setError('Mot de passe trop faible. Au moins 2 critères sur 5 doivent être remplis.');
+    // Validation du mot de passe - alignée avec le backend
+    if (!isStrongPassword(newUser.password)) {
+      setError('Mot de passe trop faible. Il faut au moins 8 caractères, avec une majuscule, une minuscule, un chiffre et un caractère spécial.');
       return;
     }
 
@@ -370,7 +409,7 @@ export default function LoginPage() {
       }
 
       setTimeout(() => {
-        router.push(`/compte/en-attente?department=${encodeURIComponent(selectedDepartment)}`);
+        router.push(`/compte/en-attente?department=${encodeURIComponent(selectedDepartment)}&email=${encodeURIComponent(newUser.email)}`);
       }, 1500);
     } catch (err: any) {
       setError(err.message);
@@ -427,12 +466,12 @@ export default function LoginPage() {
       // Stocker le token et rediriger
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      localStorage.setItem('departement', data.user.departement || selectedDepartment);
+      localStorage.setItem('departement', normalizeDepartmentRoute(data.user.departement || selectedDepartment));
       localStorage.setItem('isShared', 'true');
       localStorage.setItem('sharedUntil', data.expiresAt);
 
       setTimeout(() => {
-        router.push(`/dashboard/${data.user.departement}`);
+        router.push(`/dashboard/${normalizeDepartmentRoute(data.user.departement)}`);
       }, 2000);
     } catch (err: any) {
       setError(err.message);
@@ -740,14 +779,23 @@ export default function LoginPage() {
 
               <div>
                 <label htmlFor="password" className="block text-white/80 text-sm mb-2">{t.password}</label>
-                <input
-                  id="password"
-                  type="password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
-                  placeholder="Ex: MonMot123!"
-                />
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showNewPassword ? "text" : "password"}
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                    placeholder="Ex: MonMot123!"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-3 text-white/60 hover:text-white transition"
+                  >
+                    {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
 
                 {/* Barre de force du mot de passe */}
                 {newUser.password && (
@@ -827,14 +875,23 @@ export default function LoginPage() {
 
               <div>
                 <label htmlFor="confirmPassword" className="block text-white/80 text-sm mb-2">{t.confirmPassword}</label>
-                <input
-                  id="confirmPassword"
-                  type="password"
-                  value={newUser.confirmPassword}
-                  onChange={(e) => setNewUser({...newUser, confirmPassword: e.target.value})}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
-                  placeholder="Répétez votre mot de passe"
-                />
+                <div className="relative">
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={newUser.confirmPassword}
+                    onChange={(e) => setNewUser({...newUser, confirmPassword: e.target.value})}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                    placeholder="Répétez votre mot de passe"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-3 text-white/60 hover:text-white transition"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
 
                 {/* Vérification de correspondance */}
                 {newUser.confirmPassword && (
@@ -939,12 +996,21 @@ export default function LoginPage() {
 
                   <div>
                     <label className="block text-white/80 text-sm mb-2">Mot de passe</label>
-                    <input
-                      type="password"
-                      value={sharePassword}
-                      onChange={(e) => setSharePassword(e.target.value)}
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSharePassword ? "text" : "password"}
+                        value={sharePassword}
+                        onChange={(e) => setSharePassword(e.target.value)}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSharePassword(!showSharePassword)}
+                        className="absolute right-3 top-3 text-white/60 hover:text-white transition"
+                      >
+                        {showSharePassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div>

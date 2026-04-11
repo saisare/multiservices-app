@@ -163,7 +163,7 @@ export default function BTPInterface({ userId, userRole }: BTPInterfaceProps) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-gray-900">{chantier.budget.toLocaleString()} €</p>
+                                    <p className="font-bold text-gray-900">{(chantier.budget || 0).toLocaleString()} €</p>
                   <Link
                     href={`/dashboard/btp/chantiers/${chantier.id}`}
                     className="text-sm text-blue-600 hover:text-blue-800"

@@ -38,6 +38,16 @@ REM )
 echo ✅ MySQL (WAMP) vérifié (check désactivé)
 echo.
 
+echo ⏳ Nettoyage des ports déjà utilisés...
+for %%P in (3001 3002 3003 3004 3005 3006 3008 3009) do (
+    for /f "tokens=5" %%A in ('netstat -ano ^| findstr :%%P ^| findstr LISTENING') do (
+        echo    - Arrêt du processus %%A sur le port %%P
+        taskkill /PID %%A /F >nul 2>&1
+    )
+)
+echo ✅ Ports backend nettoyés
+echo.
+
 REM ========== TERMINAL 1: API-GATEWAY ==========
 echo 🚀 Démarrage API-GATEWAY...
 start "API-GATEWAY (3001)" cmd /k "cd /d %BACKEND%\api-gateway && npm install --silent && npm start"
@@ -97,7 +107,7 @@ echo 🎯 IMPORTANT:
 echo    • Immigration FUSIONNÉ ✅ Voir au login "Service Voyage & Immigration"
 echo    • Deux onglets au dashboard: "Voyage" et "Immigration"
 echo    • Chaque service = JWT_SECRET indépendant
-echo    • 2 BD différentes (voyage_db + voyage_immigration_db)
+echo    • 2 BD différentes (voyage_db + immigration_db)
 echo.
 echo 📝 Voir le fichier GUIDE_LANCEMENT.md pour tests complets
 echo.

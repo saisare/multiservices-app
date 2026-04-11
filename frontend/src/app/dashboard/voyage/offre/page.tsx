@@ -7,7 +7,7 @@ import {
   Plane, Hotel, Calendar, FileText, Search, Plus,
   Eye, Edit, Trash2, ArrowLeft, Save, X,
   AlertCircle, CheckCircle, Users, DollarSign,
-  Clock, MapPin, Star, CreditCard, Passport,
+  Clock, MapPin, Star, CreditCard,
   Briefcase, Heart, TrendingUp, Filter
 } from 'lucide-react';
 

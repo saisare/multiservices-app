@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { buildServiceBase } from '@/lib/runtime-api';
 import {
@@ -18,6 +18,7 @@ interface User {
   departement: string;
   actif: number;
   created_at: string;
+  has_password_vault?: number;
 }
 
 export default function AdminDashboard() {
@@ -32,6 +33,36 @@ export default function AdminDashboard() {
   const [resettingUserId, setResettingUserId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [approvingUserId, setApprovingUserId] = useState<number | null>(null);
+  const [approvalChecks, setApprovalChecks] = useState<{ [key: number]: { identity: boolean; department: boolean } }>({});
+  const [gatePassword, setGatePassword] = useState('root');
+  const [currentGatePassword, setCurrentGatePassword] = useState('root');
+  const [nextGatePassword, setNextGatePassword] = useState('');
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<number, string>>({});
+  const [loadingVisiblePasswordId, setLoadingVisiblePasswordId] = useState<number | null>(null);
+
+  const generateStrongPassword = () => {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnopqrstuvwxyz';
+    const numbers = '23456789';
+    const specials = '!@#$%^&*';
+    const all = upper + lower + numbers + specials;
+    const pick = (charset: string) => charset[Math.floor(Math.random() * charset.length)];
+
+    const password = [
+      pick(upper),
+      pick(lower),
+      pick(numbers),
+      pick(specials),
+      ...Array.from({ length: 8 }, () => pick(all)),
+    ]
+      .sort(() => Math.random() - 0.5)
+      .join('');
+
+    setNewPassword(password);
+    setSuccess(`Mot de passe fort généré: ${password}`);
+    setTimeout(() => setSuccess(null), 5000);
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -86,11 +117,34 @@ export default function AdminDashboard() {
     router.push('/');
   };
 
+  const toggleApprovalCheck = (userId: number, checkType: 'identity' | 'department') => {
+    setApprovalChecks(prev => ({
+      ...prev,
+      [userId]: {
+        identity: prev[userId]?.identity ?? false,
+        department: prev[userId]?.department ?? false,
+        [checkType]: !(prev[userId]?.[checkType] ?? false)
+      }
+    }));
+  };
+
   const handleApprove = async (userId: number) => {
+    const checks = approvalChecks[userId];
+    const approvedUser = users.find((user) => user.id === userId);
+
+    // Vérifier que les deux checkboxes sont cochées
+    if (!checks?.identity || !checks?.department) {
+      setError('Vous devez cocher les deux cases de confirmation');
+      return;
+    }
+
     const token = localStorage.getItem('token');
     try {
+      setApprovingUserId(userId);
+      setError(null);
+
       const response = await fetch(`${AUTH_API_BASE}/api/auth/users/${userId}/approve`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -98,10 +152,32 @@ export default function AdminDashboard() {
       });
 
       if (response.ok) {
-        loadUsers();
+        setSuccess('Compte approuvé avec succès');
+        if (approvedUser?.email) {
+          localStorage.setItem('lastApprovedAccount', JSON.stringify({
+            email: approvedUser.email,
+            department: approvedUser.departement,
+            approvedAt: new Date().toISOString()
+          }));
+        }
+        setApprovalChecks(prev => {
+          const newChecks = { ...prev };
+          delete newChecks[userId];
+          return newChecks;
+        });
+        setTimeout(() => {
+          setSuccess(null);
+          loadUsers();
+        }, 1500);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Erreur lors de l\'approbation');
       }
     } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur approbation');
       console.error('Erreur approbation:', err);
+    } finally {
+      setApprovingUserId(null);
     }
   };
 
@@ -144,8 +220,10 @@ export default function AdminDashboard() {
 
       if (response.ok) {
         setSuccess('Mot de passe réinitialisé avec succès');
+        setVisiblePasswords((prev) => ({ ...prev, [userId]: newPassword }));
         setResetPasswordId(null);
         setNewPassword('');
+        loadUsers();
         setTimeout(() => setSuccess(null), 3000);
       } else {
         setError('Erreur lors de la réinitialisation du mot de passe');
@@ -154,6 +232,83 @@ export default function AdminDashboard() {
       setError(err instanceof Error ? err.message : 'Erreur lors de la réinitialisation');
     } finally {
       setResettingUserId(null);
+    }
+  };
+
+  const handleRevealPassword = async (userId: number) => {
+    if (!gatePassword) {
+      setError('Mot de passe d\'accès requis pour afficher un mot de passe utilisateur');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    try {
+      setLoadingVisiblePasswordId(userId);
+      setError(null);
+
+      const response = await fetch(`${AUTH_API_BASE}/api/auth/users/${userId}/password/reveal`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ gatePassword })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Impossible d\'afficher ce mot de passe');
+      }
+
+      setVisiblePasswords((prev) => ({ ...prev, [userId]: data.password }));
+      setNewPassword(data.password);
+      setSuccess(`Mot de passe affiché pour ${data.email}`);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur affichage mot de passe');
+    } finally {
+      setLoadingVisiblePasswordId(null);
+    }
+  };
+
+  const handleHidePassword = (userId: number) => {
+    setVisiblePasswords((prev) => {
+      const next = { ...prev };
+      delete next[userId];
+      return next;
+    });
+  };
+
+  const handleChangeGatePassword = async () => {
+    if (!currentGatePassword || !nextGatePassword) {
+      setError('Les deux mots de passe d\'accès sont requis');
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    try {
+      setError(null);
+      const response = await fetch(`${AUTH_API_BASE}/api/auth/password-gate/change`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ currentPassword: currentGatePassword, newPassword: nextGatePassword })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Impossible de changer le mot de passe d\'accès');
+      }
+
+      setGatePassword(nextGatePassword);
+      setCurrentGatePassword(nextGatePassword);
+      setNextGatePassword('');
+      setSuccess('Mot de passe d\'accès changé avec succès');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur changement mot de passe d\'accès');
     }
   };
 
@@ -224,6 +379,47 @@ export default function AdminDashboard() {
           </button>
         </div>
 
+        <div className="mb-6 bg-gray-800/50 border border-gray-700 rounded-lg p-4 space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Accès protégé aux mots de passe affichables</h2>
+            <p className="text-sm text-gray-400 mt-1">
+              Les mots de passe visibles ici sont ceux enregistrés après création, réinitialisation ou changement récent.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input
+              type="password"
+              value={gatePassword}
+              onChange={(e) => setGatePassword(e.target.value)}
+              placeholder="Mot de passe d'accès actuel"
+              className="px-3 py-2 bg-gray-900 border border-gray-600 rounded text-sm"
+            />
+            <input
+              type="password"
+              value={currentGatePassword}
+              onChange={(e) => setCurrentGatePassword(e.target.value)}
+              placeholder="Ancien mot de passe d'accès"
+              className="px-3 py-2 bg-gray-900 border border-gray-600 rounded text-sm"
+            />
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={nextGatePassword}
+                onChange={(e) => setNextGatePassword(e.target.value)}
+                placeholder="Nouveau mot de passe d'accès"
+                className="flex-1 px-3 py-2 bg-gray-900 border border-gray-600 rounded text-sm"
+              />
+              <button
+                onClick={handleChangeGatePassword}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-sm transition"
+              >
+                Changer
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* TAB: Dashboard */}
         {activeTab === 'dashboard' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -276,8 +472,8 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {users.map(user => (
-                    <>
-                      <tr key={user.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                    <Fragment key={user.id}>
+                      <tr className="border-b border-gray-700 hover:bg-gray-700/50">
                       <td className="px-6 py-4 text-sm">{user.email}</td>
                       <td className="px-6 py-4 text-sm">{user.prenom} {user.nom}</td>
                       <td className="px-6 py-4 text-sm">
@@ -309,6 +505,24 @@ export default function AdminDashboard() {
                             MDP
                           </button>
                         )}
+                        {user.actif === 1 && (
+                          visiblePasswords[user.id] ? (
+                            <button
+                              onClick={() => handleHidePassword(user.id)}
+                              className="px-3 py-1 bg-slate-600 hover:bg-slate-700 rounded text-xs transition"
+                            >
+                              Masquer
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleRevealPassword(user.id)}
+                              disabled={loadingVisiblePasswordId === user.id || !user.has_password_vault}
+                              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-600 rounded text-xs transition"
+                            >
+                              {loadingVisiblePasswordId === user.id ? '...' : 'Afficher'}
+                            </button>
+                          )
+                        )}
                         <button
                           onClick={() => handleDelete(user.id)}
                           className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs transition"
@@ -322,6 +536,9 @@ export default function AdminDashboard() {
                         <td colSpan={6} className="px-6 py-4">
                           <div className="space-y-3">
                             <p className="text-sm text-gray-300">Définir un nouveau mot de passe pour <strong>{user.email}</strong></p>
+                            <p className="text-xs text-gray-500">
+                              Mot de passe visible: {visiblePasswords[user.id] ? visiblePasswords[user.id] : (user.has_password_vault ? '••••••••••••' : 'indisponible jusqu\'à une réinitialisation')}
+                            </p>
                             <div className="flex gap-2">
                               <input
                                 type="password"
@@ -330,6 +547,12 @@ export default function AdminDashboard() {
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm placeholder-gray-400"
                               />
+                              <button
+                                onClick={generateStrongPassword}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm transition"
+                              >
+                                Générer
+                              </button>
                               <button
                                 onClick={() => handleResetPassword(user.id)}
                                 disabled={resettingUserId === user.id}
@@ -361,7 +584,7 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -385,28 +608,83 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {users.filter(u => u.actif === 0).map(user => (
-                    <tr key={user.id} className="border-b border-gray-700 hover:bg-gray-700/50">
-                      <td className="px-6 py-4 text-sm">{user.email}</td>
-                      <td className="px-6 py-4 text-sm">{user.prenom} {user.nom}</td>
-                      <td className="px-6 py-4 text-sm text-gray-400">{user.departement}</td>
-                      <td className="px-6 py-4 text-sm text-gray-400">
-                        {new Date(user.created_at).toLocaleDateString('fr-FR')}
-                      </td>
-                      <td className="px-6 py-4 text-sm flex gap-2">
-                        <button
-                          onClick={() => handleApprove(user.id)}
-                          className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-xs transition"
-                        >
-                          ✅ Approuver
-                        </button>
-                        <button
-                          onClick={() => handleDelete(user.id)}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-xs transition"
-                        >
-                          ❌ Refuser
-                        </button>
-                      </td>
-                    </tr>
+                    <Fragment key={user.id}>
+                      <tr className="border-b border-gray-700 hover:bg-gray-700/50">
+                        <td className="px-6 py-4 text-sm">{user.email}</td>
+                        <td className="px-6 py-4 text-sm">{user.prenom} {user.nom}</td>
+                        <td className="px-6 py-4 text-sm text-gray-400">{user.departement}</td>
+                        <td className="px-6 py-4 text-sm text-gray-400">
+                          {new Date(user.created_at).toLocaleDateString('fr-FR')}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <button
+                            onClick={() => setApprovingUserId(approvingUserId === user.id ? null : user.id)}
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs transition"
+                          >
+                            {approvingUserId === user.id ? '✓ Masquer' : 'Confirmer'}
+                          </button>
+                        </td>
+                      </tr>
+
+                      {approvingUserId === user.id && (
+                        <tr className="border-b border-gray-700 bg-gray-800/50">
+                          <td colSpan={5} className="px-6 py-4">
+                            <div className="space-y-4">
+                              <h4 className="font-semibold text-white">Confirmer l'approbation de {user.email}</h4>
+
+                              <div className="space-y-3 bg-gray-900 p-4 rounded">
+                                <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-800 p-2 rounded transition">
+                                  <input
+                                    type="checkbox"
+                                    checked={approvalChecks[user.id]?.identity ?? false}
+                                    onChange={() => toggleApprovalCheck(user.id, 'identity')}
+                                    className="w-5 h-5 accent-green-600"
+                                  />
+                                  <span className="text-sm text-gray-300">
+                                    J'ai vérifié l'identité de <strong>{user.prenom} {user.nom}</strong>
+                                  </span>
+                                </label>
+
+                                <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-800 p-2 rounded transition">
+                                  <input
+                                    type="checkbox"
+                                    checked={approvalChecks[user.id]?.department ?? false}
+                                    onChange={() => toggleApprovalCheck(user.id, 'department')}
+                                    className="w-5 h-5 accent-green-600"
+                                  />
+                                  <span className="text-sm text-gray-300">
+                                    Le département <strong>{user.departement}</strong> est correct
+                                  </span>
+                                </label>
+                              </div>
+
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleApprove(user.id)}
+                                  disabled={!(approvalChecks[user.id]?.identity && approvalChecks[user.id]?.department)}
+                                  className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-sm transition flex items-center gap-2"
+                                >
+                                  <CheckCircle size={16} />
+                                  Approuver
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(user.id)}
+                                  className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded text-sm transition"
+                                >
+                                  Refuser
+                                </button>
+                                <button
+                                  onClick={() => setApprovingUserId(null)}
+                                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded text-sm transition"
+                                >
+                                  Annuler
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

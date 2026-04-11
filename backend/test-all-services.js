@@ -46,11 +46,11 @@ const SERVICES = [
   { name: 'Auth', port: 3002, path: '/health' },
   { name: 'BTP', port: 3003, path: '/health' },
   { name: 'API Gateway', port: 3001, path: '/health' },
-  { name: 'Voyage', port: 3005, path: '/health' },
-  { name: 'Immigration', port: 3006, path: '/health' },
-  { name: 'RH', port: 3007, path: '/health' },
-  { name: 'Communication', port: 3008, path: '/health' },
-  { name: 'Logistique', port: 3009, path: '/health' }
+  { name: 'Assurances', port: 3004, path: '/health' },
+  { name: 'Communication', port: 3005, path: '/health' },
+  { name: 'RH', port: 3006, path: '/health' },
+  { name: 'Logistique', port: 3008, path: '/health' },
+  { name: 'Voyage/Immigration', port: 3009, path: '/health' }
 ];
 
 async function testServices() {
@@ -123,7 +123,7 @@ async function testServices() {
   console.log('📋 STEP 4: Test Voyage Service API\n');
 
   try {
-    const voyageRes = await req('GET', 'localhost', 3005, '/api/voyage/clients', null, token);
+    const voyageRes = await req('GET', 'localhost', 3009, '/api/voyage/clients', null, token);
 
     if(voyageRes.status === 200 || voyageRes.status === 401) {
       console.log(`✅ Voyage API accessible (status: ${voyageRes.status})`);
@@ -139,7 +139,7 @@ async function testServices() {
   console.log('📋 STEP 5: Test Immigration Service API\n');
 
   try {
-    const immRes = await req('GET', 'localhost', 3006, '/api/immigration/demandeurs', null, token);
+    const immRes = await req('GET', 'localhost', 3009, '/api/voyage/immigration/demandeurs', null, token);
 
     if(immRes.status === 200 || immRes.status === 401) {
       console.log(`✅ Immigration API accessible (status: ${immRes.status})`);
@@ -180,11 +180,11 @@ async function testServices() {
   console.log('   Terminal 1: cd backend/auth-service && npm start');
   console.log('   Terminal 2: cd backend/btp && npm start');
   console.log('   Terminal 3: cd backend/api-gateway && npm start');
-  console.log('   Terminal 4: cd backend/service-voyage && npm start');
-  console.log('   Terminal 5: cd backend/service-immigration && npm start');
+  console.log('   Terminal 4: cd backend/assurances && npm start');
+  console.log('   Terminal 5: cd backend/communication && npm start');
   console.log('   Terminal 6: cd backend/rh && npm start');
-  console.log('   Terminal 7: cd backend/communication && npm start');
-  console.log('   Terminal 8: cd backend/service-logistique && npm start');
+  console.log('   Terminal 7: cd backend/service-logistique && npm start');
+  console.log('   Terminal 8: cd backend/service-voyage && npm start');
   console.log('   Terminal 9: cd frontend && npm run dev\n');
 }
 

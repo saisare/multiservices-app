@@ -8,6 +8,7 @@ import {
   CheckCircle, AlertCircle, Plus, Download,
   Filter, Search, BarChart3, Award, PieChart
 } from 'lucide-react';
+import { rhApi } from '@/services/api/rh.api';
 
 interface DashboardStats {
   totalEmployes: number;
@@ -40,29 +41,72 @@ interface Alerte {
 
 export default function RHDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
-    totalEmployes: 128,
-    hommes: 72,
-    femmes: 56,
-    actifs: 118,
-    enConges: 8,
-    nouveauxMois: 5,
-    contratsCDI: 98,
-    contratsCDD: 20,
-    tauxAbsenteisme: 3.2,
-    satisfactionMoyenne: 4.2
+    totalEmployes: 0,
+    hommes: 0,
+    femmes: 0,
+    actifs: 0,
+    enConges: 0,
+    nouveauxMois: 0,
+    contratsCDI: 0,
+    contratsCDD: 0,
+    tauxAbsenteisme: 0,
+    satisfactionMoyenne: 0
   });
 
-  const [congesEnCours, setCongesEnCours] = useState<CongeEnCours[]>([
-    { id: 1, employe: 'Jean Konan', type: 'ANNUEL', date_debut: '2026-03-20', date_fin: '2026-04-03', statut: 'VALIDE' },
-    { id: 2, employe: 'Aminata Diallo', type: 'MALADIE', date_debut: '2026-03-22', date_fin: '2026-03-28', statut: 'VALIDE' },
-    { id: 3, employe: 'Amadou Touré', type: 'ANNUEL', date_debut: '2026-03-25', date_fin: '2026-04-08', statut: 'EN_ATTENTE' },
-  ]);
+  const [congesEnCours, setCongesEnCours] = useState<CongeEnCours[]>([]);
 
   const [alertes, setAlertes] = useState<Alerte[]>([
     { id: 1, type: 'Contrat', message: 'Contrat CDD de Marie Diallo expire dans 15 jours', priorite: 'HAUTE' },
     { id: 2, type: 'Formation', message: 'Jean Konan doit effectuer sa formation annuelle', priorite: 'MOYENNE' },
     { id: 3, type: 'Évaluation', message: 'Évaluation semestrielle en retard pour 3 employés', priorite: 'BASSE' },
   ]);
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      const [statsData, congesData] = await Promise.all([
+        rhApi.getStats(),
+        rhApi.getConges(),
+      ]);
+
+      const totalEmployes = Number(statsData.total_employes || 0);
+      const enConges = Number(statsData.en_conges || 0);
+
+      setStats({
+        totalEmployes,
+        hommes: 0,
+        femmes: 0,
+        actifs: totalEmployes,
+        enConges,
+        nouveauxMois: Number(statsData.nouveaux_employes || 0),
+        contratsCDI: Number(statsData.contrats_cdi || 0),
+        contratsCDD: Number(statsData.contrats_cdd || 0),
+        tauxAbsenteisme: totalEmployes ? Number(((enConges / totalEmployes) * 100).toFixed(1)) : 0,
+        satisfactionMoyenne: Number(statsData.satisfaction_moyenne || 0)
+      });
+
+      const currentLeaves = (congesData || [])
+        .filter((conge) => conge.statut === 'VALIDE')
+        .slice(0, 5)
+        .map((conge) => ({
+          id: conge.id,
+          employe: [conge.employe_prenom, conge.employe_nom].filter(Boolean).join(' ').trim() || `Employé #${conge.employe_id}`,
+          type: conge.type_conge,
+          date_debut: conge.date_debut,
+          date_fin: conge.date_fin,
+          statut: conge.statut
+        }));
+
+      setCongesEnCours(currentLeaves);
+
+      setAlertes([
+        { id: 1, type: 'Congés', message: `${statsData.conges_attente || 0} demande(s) de congé en attente`, priorite: Number(statsData.conges_attente || 0) > 0 ? 'HAUTE' : 'BASSE' },
+        { id: 2, type: 'Contrats', message: `${statsData.total_contrats || 0} contrat(s) enregistrés`, priorite: 'MOYENNE' },
+        { id: 3, type: 'Documents', message: `${statsData.total_documents || 0} document(s) RH archivés`, priorite: 'BASSE' },
+      ]);
+    };
+
+    loadDashboard();
+  }, []);
 
   return (
     <div className="space-y-6">

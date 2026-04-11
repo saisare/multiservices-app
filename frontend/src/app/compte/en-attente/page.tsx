@@ -1,9 +1,10 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Clock3, ShieldCheck } from 'lucide-react';
+import { buildServiceBase } from '@/lib/runtime-api';
 
 const departmentLabels: Record<string, string> = {
   btp: 'BTP',
@@ -20,7 +21,42 @@ const departmentLabels: Record<string, string> = {
 export default function CompteEnAttentePage() {
   const searchParams = useSearchParams();
   const department = searchParams.get('department') || '';
+  const email = searchParams.get('email') || '';
   const label = departmentLabels[department] || department || 'département sélectionné';
+  const [status, setStatus] = useState<'pending' | 'approved'>('pending');
+
+  useEffect(() => {
+    if (!email) return;
+
+    let cancelled = false;
+
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`${buildServiceBase(3002)}/api/auth/account-status?email=${encodeURIComponent(email)}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!cancelled && data?.status === 'approved') {
+          setStatus('approved');
+        }
+      } catch {
+        // Silencieux côté utilisateur: la page reste stable même si le service auth répond lentement.
+      }
+    };
+
+    void checkStatus();
+    const interval = window.setInterval(checkStatus, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [email]);
+
+  const nextStep = useMemo(
+    () => status === 'approved' ? 'Validation confirmée' : 'Connexion après approbation',
+    [status]
+  );
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.18),_transparent_35%),linear-gradient(180deg,#fff7ed_0%,#ffffff_42%,#f8fafc_100%)] px-4 py-10">
@@ -36,9 +72,9 @@ export default function CompteEnAttentePage() {
           </h1>
 
           <p className="mt-4 text-base leading-7 text-slate-600">
-            Votre demande existe bien dans le système et attend maintenant la validation de l'administration.
-            Tant que cette validation n'est pas faite, l'accès direct au tableau de bord reste bloqué pour protéger
-            les données du logiciel.
+            {status === 'approved'
+              ? 'Votre demande a été approuvée. Vous pouvez maintenant revenir à la connexion.'
+              : 'Votre demande a bien été enregistrée. Cette page se mettra à jour automatiquement dès validation.'}
           </p>
 
           <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -50,30 +86,21 @@ export default function CompteEnAttentePage() {
             <Card
               icon={<Clock3 className="h-5 w-5 text-orange-600" />}
               title="Statut actuel"
-              text="En attente de validation"
+              text={status === 'approved' ? 'Approuvé' : 'En attente de validation'}
             />
             <Card
               icon={<CheckCircle2 className="h-5 w-5 text-orange-600" />}
               title="Étape suivante"
-              text="Connexion après approbation"
+              text={nextStep}
             />
-          </div>
-
-          <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
-            <p className="font-semibold text-slate-900">Ce que cela veut dire concrètement</p>
-            <p className="mt-2">
-              Les informations de création sont enregistrées dans `auth_db.pending_users`. Lorsqu'un administrateur
-              approuve la demande, le compte est ensuite déplacé vers `auth_db.users` et l'utilisateur peut se connecter
-              normalement à son département.
-            </p>
           </div>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href={`/login?department=${encodeURIComponent(department)}`}
-              className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-700"
+              href={`/login?department=${encodeURIComponent(department)}${email ? `&email=${encodeURIComponent(email)}` : ''}`}
+              className={`inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${status === 'approved' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}
             >
-              Revenir à la connexion
+              {status === 'approved' ? 'Se connecter maintenant' : 'Revenir à la connexion'}
             </Link>
             <Link
               href="/login"

@@ -40,7 +40,7 @@ export type Notification = {
   sender_id?: number;
   title: string;
   message: string;
-  data: any;
+  data: Record<string, unknown> | null;
   is_read: number;
   created_at: string;
 };
@@ -52,6 +52,51 @@ export type ConnectionLog = {
   departement: string;
   success: number;
   created_at: string;
+};
+
+export type Department = {
+  id: number;
+  code: string;
+  nom: string;
+  description?: string;
+  created_at: string;
+};
+
+export type Announcement = {
+  id: number;
+  target_department: string;
+  title: string;
+  message: string;
+  priority: string;
+  created_at: string;
+  sender_nom?: string;
+  sender_prenom?: string;
+};
+
+export type InternalMessage = {
+  id: number;
+  subject: string;
+  message: string;
+  status: string;
+  target_department?: string;
+  created_at: string;
+  sender_nom?: string;
+  sender_prenom?: string;
+  recipient_nom?: string;
+  recipient_prenom?: string;
+};
+
+export type DocumentTransfer = {
+  id: number;
+  recipient_department: string;
+  title: string;
+  document_type: string;
+  reference_code?: string;
+  notes?: string;
+  status: string;
+  created_at: string;
+  sender_nom?: string;
+  sender_prenom?: string;
 };
 
 const AUTH_API_BASE = buildServiceBase(3002);
@@ -121,7 +166,8 @@ export const showUser = async (id: number): Promise<{ success: boolean; message:
 
 // Pending Users
 export const getPendingUsers = async (): Promise<PendingUser[]> => {
-  return request<PendingUser[]>('/api/auth/pending-users');
+  const response = await request<{ success: boolean; users: PendingUser[] }>('/api/auth/pending-users');
+  return response.users || [];
 };
 
 export const approvePendingUser = async (id: number): Promise<{ success: boolean; user: User }> => {
@@ -137,7 +183,8 @@ export const rejectPendingUser = async (id: number, reason?: string): Promise<{ 
 
 // Notifications
 export const getNotifications = async (): Promise<Notification[]> => {
-  return request<Notification[]>('/api/auth/notifications');
+  const response = await request<{ success: boolean; notifications: Notification[] }>('/api/auth/notifications');
+  return response.notifications || [];
 };
 
 export const markNotificationRead = async (id: number): Promise<void> => {
@@ -149,14 +196,92 @@ export const getConnectionLogs = async (limit = 100): Promise<ConnectionLog[]> =
   return request<ConnectionLog[]>(`/api/logs/connection?limit=${limit}`);
 };
 
+export const getMonitoringOverview = async (): Promise<Record<string, number>> => {
+  return request<Record<string, number>>('/api/auth/monitoring/overview');
+};
+
+export const getDepartments = async (): Promise<Department[]> => {
+  return request<Department[]>('/api/auth/departments');
+};
+
+export const sendDepartmentNotification = async (payload: {
+  title: string;
+  message: string;
+  department?: string;
+  recipientId?: number;
+}): Promise<{ success: boolean; delivered: number; department?: string }> => {
+  return request('/api/auth/notifications/send', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const getAnnouncements = async (department?: string): Promise<Announcement[]> => {
+  const suffix = department ? `?department=${encodeURIComponent(department)}` : '';
+  return request<Announcement[]>(`/api/auth/announcements${suffix}`);
+};
+
+export const createAnnouncement = async (payload: {
+  title: string;
+  message: string;
+  targetDepartment?: string;
+  priority?: string;
+}): Promise<{ success: boolean; id: number; message: string }> => {
+  return request('/api/auth/announcements', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const getInternalMessages = async (): Promise<InternalMessage[]> => {
+  return request<InternalMessage[]>('/api/auth/internal-messages');
+};
+
+export const createInternalMessage = async (payload: {
+  subject: string;
+  message: string;
+  recipientId?: number;
+  targetDepartment?: string;
+}): Promise<{ success: boolean; id: number; message: string }> => {
+  return request('/api/auth/internal-messages', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const getDocumentTransfers = async (): Promise<DocumentTransfer[]> => {
+  return request<DocumentTransfer[]>('/api/auth/document-transfers');
+};
+
+export const createDocumentTransfer = async (payload: {
+  recipientDepartment: string;
+  title: string;
+  documentType?: string;
+  referenceCode?: string;
+  notes?: string;
+}): Promise<{ success: boolean; id: number; message: string }> => {
+  return request('/api/auth/document-transfers', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
 // Services Status (health checks)
 export const getServicesStatus = async (): Promise<Record<string, { status: string; lastCheck: string }>> => {
-  const services = ['auth', 'btp', 'logistique', 'assurance', 'communication', 'rh', 'voyage', 'immigration'];
-  const status = {};
-  
-  for (const service of services) {
+  const services: Record<string, number> = {
+    auth: 3002,
+    btp: 3003,
+    assurances: 3004,
+    communication: 3005,
+    rh: 3006,
+    logistique: 3008,
+    voyage: 3009,
+  };
+  const status: Record<string, { status: string; lastCheck: string }> = {};
+
+  for (const [service, port] of Object.entries(services)) {
     try {
-      const res = await fetch(`${buildServiceBase(3002 + services.indexOf(service) + 1)}/health`, {
+      const res = await fetch(`${buildServiceBase(port)}/health`, {
         headers: buildHeaders(false),
       });
       status[service] = { status: res.ok ? 'OK' : 'DOWN', lastCheck: new Date().toISOString() };
@@ -167,4 +292,3 @@ export const getServicesStatus = async (): Promise<Record<string, { status: stri
   
   return status;
 };
-

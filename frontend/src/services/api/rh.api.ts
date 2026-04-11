@@ -53,6 +53,8 @@ export interface Employe {
   departement: string;
   date_embauche: string;
   salaire_base: number;
+  adresse?: string;
+  actif?: number;
 }
 
 export interface Conge {
@@ -65,6 +67,75 @@ export interface Conge {
   date_fin: string;
   motif: string;
   statut: string;
+  nb_jours?: number;
+  date_demande?: string;
+}
+
+export interface ContratRh {
+  id: number;
+  employe_id: number;
+  numero_contrat: string;
+  type_contrat: string;
+  date_debut: string;
+  date_fin?: string;
+  poste?: string;
+  salaire?: number;
+  statut: string;
+  employe_nom?: string;
+  employe_prenom?: string;
+}
+
+export interface EvaluationRh {
+  id: number;
+  employe_id: number;
+  date_evaluation: string;
+  periode?: string;
+  note_technique?: number;
+  note_comportement?: number;
+  note_global?: number;
+  commentaires?: string;
+  employe_nom?: string;
+  employe_prenom?: string;
+}
+
+export interface FormationRh {
+  id: number;
+  employe_id: number;
+  titre: string;
+  organisme?: string;
+  date_debut?: string;
+  date_fin?: string;
+  duree_heures?: number;
+  cout?: number;
+  employe_nom?: string;
+  employe_prenom?: string;
+}
+
+export interface DocumentRh {
+  id: number;
+  employe_id: number;
+  type_document: string;
+  nom_fichier?: string;
+  chemin_fichier?: string;
+  confidentiel?: number;
+  employe_nom?: string;
+  employe_prenom?: string;
+}
+
+export interface PaieRh {
+  id: number;
+  employe_id: number;
+  mois: number;
+  annee: number;
+  salaire_base?: number;
+  primes?: number;
+  indemnites?: number;
+  cotisations?: number;
+  net_a_payer?: number;
+  date_paie?: string;
+  statut: string;
+  employe_nom?: string;
+  employe_prenom?: string;
 }
 
 export const rhApi = {
@@ -139,6 +210,86 @@ export const rhApi = {
       console.error('Error fetching stats:', error);
       return {};
     }
+  },
+
+  getContrats: async (): Promise<ContratRh[]> => {
+    try {
+      return await request<ContratRh[]>('/contrats');
+    } catch (error) {
+      console.error('Error fetching contrats:', error);
+      return [];
+    }
+  },
+
+  createContrat: async (data: Record<string, unknown>) => {
+    return request<{ id: number; numero_contrat: string; message: string }>('/contrats', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getEvaluations: async (): Promise<EvaluationRh[]> => {
+    try {
+      return await request<EvaluationRh[]>('/evaluations');
+    } catch (error) {
+      console.error('Error fetching evaluations:', error);
+      return [];
+    }
+  },
+
+  createEvaluation: async (data: Record<string, unknown>) => {
+    return request<{ id: number; message: string }>('/evaluations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getFormations: async (): Promise<FormationRh[]> => {
+    try {
+      return await request<FormationRh[]>('/formations');
+    } catch (error) {
+      console.error('Error fetching formations:', error);
+      return [];
+    }
+  },
+
+  createFormation: async (data: Record<string, unknown>) => {
+    return request<{ id: number; message: string }>('/formations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getDocuments: async (): Promise<DocumentRh[]> => {
+    try {
+      return await request<DocumentRh[]>('/documents');
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      return [];
+    }
+  },
+
+  createDocument: async (data: Record<string, unknown>) => {
+    return request<{ id: number; message: string }>('/documents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getPaie: async (): Promise<PaieRh[]> => {
+    try {
+      return await request<PaieRh[]>('/paie');
+    } catch (error) {
+      console.error('Error fetching paie:', error);
+      return [];
+    }
+  },
+
+  createPaie: async (data: Record<string, unknown>) => {
+    return request<{ id: number; message: string }>('/paie', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 };
 
